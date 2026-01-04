@@ -2954,6 +2954,46 @@
 
 ---
 
+## 2026-01-02（Vercel Cron Jobs制限対応：Cron Jobsの統合）
+
+### 問題
+
+- Vercelの無料プランでは、チームあたり最大2つのCron Jobsしか作成できない
+- 既に他のプロジェクトで2つのCron Jobsを使用していたため、このプロジェクトで2つのCron Jobsを作成しようとしてデプロイエラーが発生
+- エラーメッセージ: `Your plan allows your team to create up to 2 Cron Jobs. Your team currently has 2, and this project is attempting to create 2 more, exceeding your team's limit.`
+
+### 解決策
+
+**2つのCron Jobsを1つに統合**
+
+1. **退職済みユーザー無効化処理を自動注文実行APIに統合**
+   - 退職済みユーザーの無効化処理を`/api/auto-order/run`内で実行するように変更
+   - 自動注文実行の前に退職済みユーザーを無効化
+   - エラーが発生しても自動注文処理は続行（ログに記録）
+
+2. **`vercel.json`からCron Jobを削除**
+   - `/api/admin/users/deactivate-expired`のCron Job設定を削除
+   - `/api/auto-order/run`のCron Jobのみ残す（1つに統合）
+
+### 変更の影響
+
+- **退職済みユーザー無効化の実行タイミング**: 毎日0:00 JST → 毎日10:00 JST（自動注文実行時）
+- **実行頻度**: 1日1回（自動注文実行時）
+- **`/api/admin/users/deactivate-expired`**: APIは残しており、手動実行やテストで使用可能
+
+### 修正ファイル
+
+- `app/api/auto-order/run/route.ts`: 退職済みユーザー無効化処理を追加
+- `vercel.json`: Cron Job設定を1つに削減
+
+### 確認事項
+
+- ✅ VercelのCron Jobs制限を回避（1つのCron Jobのみ使用）
+- ✅ 退職済みユーザー無効化処理が自動注文実行時に実行される
+- ✅ デプロイエラーが解消される
+
+---
+
 ## 変更履歴の記録ルール
 
 - 日付は `YYYY-MM-DD` 形式で記載
