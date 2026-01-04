@@ -233,32 +233,20 @@ export default function AdminUsersPage() {
 
     try {
       setError(null);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/users/page.tsx:237',message:'handleDelete: Before DELETE request',data:{userId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       const response = await fetch(`/api/admin/users/${id}`, {
         method: "DELETE",
       });
 
       const result = await response.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/users/page.tsx:243',message:'handleDelete: After DELETE response',data:{userId:id,ok:response.ok,result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
 
       if (!response.ok) {
         setError(result.error || "削除に失敗しました");
         return;
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/users/page.tsx:250',message:'handleDelete: Before fetchUsers',data:{userId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       // 一覧を再取得（承認待ちリストも更新）
       await fetchUsers();
       await fetchPendingUsers();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/users/page.tsx:253',message:'handleDelete: After fetchUsers and fetchPendingUsers',data:{userId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
     } catch (err) {
       console.error("Delete error:", err);
       setError("削除中にエラーが発生しました");

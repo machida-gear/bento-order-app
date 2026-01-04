@@ -43,12 +43,6 @@ export default async function CalendarPage({
     is_active: boolean;
   } | null = null;
 
-  // デバッグログ
-  console.log("=== Calendar Page Debug ===");
-  console.log("Current user ID:", user.id);
-  console.log("Is admin:", isAdmin);
-  console.log("Params user_id:", params.user_id);
-
   if (isAdmin && params.user_id) {
     // 管理者が指定したユーザーIDが存在するか確認（Service Role Keyを使用）
     const { data: profileData } = await supabaseAdmin
@@ -57,20 +51,11 @@ export default async function CalendarPage({
       .eq("id", params.user_id)
       .single();
 
-    console.log("Target profile data:", profileData);
-
     if (profileData) {
       targetUserId = params.user_id;
       targetProfile = profileData;
-      console.log("Target user ID set to:", targetUserId);
-    } else {
-      console.log("Target profile not found, using current user ID");
     }
-  } else {
-    console.log("Not admin or no user_id param, using current user ID");
   }
-
-  console.log("Final target user ID:", targetUserId);
 
   // URLパラメータから年月を取得（なければ現在の年月）
   // monthは1-12で統一（URLでも1-12、表示でも1-12）
@@ -137,13 +122,6 @@ export default async function CalendarPage({
     .lte("order_date", endDateStr)
     .order("order_date", { ascending: true });
 
-  // デバッグログ
-  console.log("Orders fetched for user ID:", targetUserId);
-  console.log("Orders count:", orders?.length || 0);
-  if (ordersError) {
-    console.error("Orders error:", ordersError);
-  }
-
   // システム設定を取得（max_order_days_ahead）
   const { data: systemSettings } = await supabase
     .from("system_settings")
@@ -151,13 +129,7 @@ export default async function CalendarPage({
     .eq("id", 1)
     .single();
 
-  // エラー処理
-  if (calendarError || ordersError) {
-    console.error(
-      "Error fetching calendar data:",
-      calendarError || ordersError
-    );
-  }
+  // エラー処理（エラーはUIで表示されるため、コンソールログは不要）
 
   // メニューデータを取得（注文がある場合のみ）
   // 注文データが存在する場合は、メニューデータが取得できなくても注文を表示する
@@ -174,7 +146,6 @@ export default async function CalendarPage({
             // 実際のDBカラム名はmenu_item_id（型定義のmenu_idではない）
             const menuItemId = order.menu_item_id || order.menu_id;
             if (!menuItemId) {
-              console.warn("Order missing menu_item_id:", order);
               return null;
             }
             // bigint型は文字列として返される可能性があるため、文字列として扱う
@@ -190,7 +161,6 @@ export default async function CalendarPage({
         .map((id) => {
           const num = Number(id);
           if (isNaN(num)) {
-            console.warn("Invalid menu item ID:", id);
             return null;
           }
           return num;
@@ -213,10 +183,6 @@ export default async function CalendarPage({
         .in("id", menuItemIdsAsNumbers)
         .eq("is_active", true); // アクティブなメニューのみ取得
 
-      if (menuItemsError) {
-        console.error("Error fetching menu items:", menuItemsError);
-      }
-
       // 注文データにメニュー情報を結合
       if (menuItems && menuItems.length > 0) {
         // メニューIDを文字列に変換してマップを作成（bigint型の比較を確実にするため）
@@ -230,11 +196,6 @@ export default async function CalendarPage({
           const rawMenuItemId = order.menu_item_id ?? order.menu_id;
 
           if (!rawMenuItemId) {
-            console.warn("Order missing menu_item_id:", {
-              order_id: order.id,
-              order_date: order.order_date,
-              order_keys: Object.keys(order),
-            });
             return {
               ...order,
               menu_items: null,
@@ -244,16 +205,6 @@ export default async function CalendarPage({
           // bigint型を文字列に変換してマップから取得
           const menuItemId = String(rawMenuItemId);
           const menuItem = menuItemsMap.get(menuItemId);
-
-          if (!menuItem) {
-            console.warn("Menu item not found for ID:", {
-              menu_item_id: menuItemId,
-              raw_value: rawMenuItemId,
-              raw_type: typeof rawMenuItemId,
-              available_ids: Array.from(menuItemsMap.keys()),
-              order_id: order.id,
-            });
-          }
 
           return {
             ...order,

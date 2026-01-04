@@ -228,7 +228,6 @@ export async function PUT(
       .single();
 
     if (updateError) {
-      console.error("Order update error:", updateError);
       return NextResponse.json(
         {
           error: "注文の更新に失敗しました",
@@ -259,7 +258,6 @@ export async function PUT(
       });
     } catch (auditLogError) {
       // 監査ログの記録エラーは無視（更新は成功しているため）
-      console.error("Audit log insert error:", auditLogError);
     }
 
     return NextResponse.json({
@@ -267,7 +265,6 @@ export async function PUT(
       order: updatedOrder,
     });
   } catch (error) {
-    console.error("Order update API error:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
@@ -341,12 +338,7 @@ export async function PATCH(
     const resolvedParams = await Promise.resolve(params);
     const orderId = parseInt(resolvedParams.id, 10);
 
-    console.log("=== Cancel Order Request ===");
-    console.log("Raw params:", resolvedParams);
-    console.log("Parsed orderId:", orderId, "type:", typeof orderId);
-
     if (isNaN(orderId)) {
-      console.error("Invalid orderId:", resolvedParams.id);
       return NextResponse.json({ error: "注文IDが無効です" }, { status: 400 });
     }
 
@@ -422,13 +414,6 @@ export async function PATCH(
     }
 
     // 注文をキャンセル（Service Role Keyを使用してRLSをバイパス）
-    console.log("Attempting to cancel order:", {
-      orderId,
-      userId: user.id,
-      currentStatus: order.status,
-      isAdmin,
-    });
-
     const cancelQuery = supabaseAdmin
       .from("orders")
       .update({ status: "canceled" })
@@ -442,21 +427,7 @@ export async function PATCH(
       .select()
       .single();
 
-    console.log("Update result:", {
-      error: updateError,
-      updatedOrder: updatedOrder
-        ? { id: updatedOrder.id, status: updatedOrder.status }
-        : null,
-    });
-
     if (updateError) {
-      console.error("Order cancel error:", updateError);
-      console.error("Error details:", {
-        message: updateError.message,
-        details: updateError.details,
-        hint: updateError.hint,
-        code: updateError.code,
-      });
       return NextResponse.json(
         {
           error: "注文のキャンセルに失敗しました",
@@ -486,7 +457,6 @@ export async function PATCH(
       });
     } catch (auditLogError) {
       // 監査ログの記録エラーは無視（キャンセルは成功しているため）
-      console.error("Audit log insert error:", auditLogError);
     }
 
     return NextResponse.json({
@@ -494,15 +464,11 @@ export async function PATCH(
       order: updatedOrder,
     });
   } catch (error) {
-    console.error("Order cancel API error:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("Error stack:", errorStack);
     return NextResponse.json(
       {
         error: "注文キャンセル処理中にエラーが発生しました: " + errorMessage,
-        details: errorStack,
       },
       { status: 500 }
     );

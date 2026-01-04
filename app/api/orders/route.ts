@@ -202,7 +202,6 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
     if (existingOrderError) {
-      console.error("Existing order check error:", existingOrderError);
       return NextResponse.json(
         { error: "注文の確認中にエラーが発生しました" },
         { status: 500 }
@@ -254,14 +253,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 価格ID取得（DB関数を使用）
-    console.log(
-      "Fetching price for menu_id:",
-      menu_id,
-      "type:",
-      typeof menu_id,
-      "order_date:",
-      order_date
-    );
     try {
       const { data: priceData, error: priceError } = await supabaseAdmin.rpc(
         "get_menu_price_id",
@@ -271,19 +262,7 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      console.log("Price fetch result:", {
-        priceData,
-        priceError,
-        priceDataType: typeof priceData,
-      });
-
       if (priceError) {
-        console.error("Price fetch error details:", {
-          message: priceError.message,
-          details: priceError.details,
-          hint: priceError.hint,
-          code: priceError.code,
-        });
         return NextResponse.json(
           {
             error: "価格情報の取得に失敗しました",
@@ -297,7 +276,6 @@ export async function POST(request: NextRequest) {
       }
 
       if (!priceData && priceData !== 0) {
-        console.error("Price data is null or undefined");
         return NextResponse.json(
           {
             error: "価格情報が見つかりませんでした",
@@ -308,12 +286,6 @@ export async function POST(request: NextRequest) {
       }
 
       const menu_price_id = priceData as number;
-      console.log(
-        "Menu price ID:",
-        menu_price_id,
-        "type:",
-        typeof menu_price_id
-      );
 
       // 価格情報を取得（unit_price_snapshot用）
       const { data: priceInfo, error: priceInfoError } = await supabaseAdmin
@@ -323,7 +295,6 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (priceInfoError || !priceInfo) {
-        console.error("Price info fetch error:", priceInfoError);
         return NextResponse.json(
           {
             error: "価格情報の取得に失敗しました",
@@ -375,15 +346,6 @@ export async function POST(request: NextRequest) {
 
           // ordered状態の注文がない場合は、UNIQUE制約違反の原因が不明
           // キャンセル済みの注文がある可能性があるので、エラーメッセージを改善
-          console.error(
-            "UNIQUE constraint violation but no ordered order found:",
-            {
-              user_id: targetUserId,
-              order_date,
-              insertError: insertError.message,
-            }
-          );
-
           return NextResponse.json(
             {
               error:
@@ -394,18 +356,6 @@ export async function POST(request: NextRequest) {
             { status: 500 }
           );
         }
-
-        console.error("Order insert error:", insertError);
-        console.error("Insert error details:", {
-          code: insertError.code,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          menu_id,
-          menu_price_id,
-          order_date,
-          quantity,
-        });
         return NextResponse.json(
           {
             error: "注文の作成に失敗しました",
@@ -438,7 +388,6 @@ export async function POST(request: NextRequest) {
         });
       } catch (auditLogError) {
         // 監査ログの記録エラーは無視（注文は成功しているため）
-        console.error("Audit log insert error:", auditLogError);
       }
 
       return NextResponse.json({
@@ -446,7 +395,6 @@ export async function POST(request: NextRequest) {
         order: orderData,
       });
     } catch (rpcError) {
-      console.error("RPC call error:", rpcError);
       const errorMessage =
         rpcError instanceof Error ? rpcError.message : "Unknown error";
       return NextResponse.json(
@@ -458,7 +406,6 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("Order API error:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

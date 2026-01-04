@@ -101,7 +101,7 @@ export default async function NewOrderPage({
     .order('name', { ascending: true })
 
   if (vendorsError) {
-    console.error('Vendors fetch error:', vendorsError)
+    // エラーは無視（空の配列として扱う）
   }
 
   // 業者が存在する場合のみメニューを取得
@@ -126,7 +126,7 @@ export default async function NewOrderPage({
   }
 
   if (menuItemsError) {
-    console.error('Menu items fetch error:', menuItemsError)
+    // エラーは無視（空の配列として扱う）
   }
 
   // 業者別にメニューをグループ化（vendor_idを使用）

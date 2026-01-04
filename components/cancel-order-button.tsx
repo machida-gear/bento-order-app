@@ -51,7 +51,6 @@ export default function CancelOrderButton({
       // キャンセル成功後、ページをリフレッシュ
       router.refresh();
     } catch (err) {
-      console.error("Cancel error:", err);
       setError("キャンセル処理中にエラーが発生しました");
       setLoading(false);
       setShowConfirm(false);

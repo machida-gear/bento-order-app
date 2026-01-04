@@ -2485,6 +2485,301 @@
 
 ---
 
+## 2026-01-02（環境変数設定手順の詳細化とログイン問題の解決）
+
+### 環境変数設定手順の詳細化
+
+#### 実装内容
+
+- `.env.local`ファイルの作成手順をステップバイステップで詳細化
+- Supabase Dashboardからの値取得手順を追加
+- 環境変数の確認方法を追加
+- 使用されている環境変数の完全なリストを追加
+
+#### 追加内容
+
+1. **`.env.local`ファイルの作成手順**
+   - PowerShellでのコピー方法
+   - 手動での作成方法
+   - ファイルの保存方法
+
+2. **Supabaseの値取得手順**
+   - Supabase Dashboardへのアクセス方法
+   - Project Settings > APIからの値取得方法
+   - 各環境変数の取得箇所の明示
+
+3. **環境変数の設定方法**
+   - 実際の値の設定例
+   - プレースホルダー値の置き換え方法
+   - コメント行の説明
+
+4. **トラブルシューティングの拡充**
+   - ログインできない場合（「Failed to fetch」エラー）の対処法
+   - 環境変数がプレースホルダーのままの場合の対処法
+   - ファイルが見つからない場合の対処法
+
+#### 使用されている環境変数の完全なリスト
+
+コードベース全体で使用されている環境変数を整理：
+
+- **必須環境変数**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTO_ORDER_SECRET`
+- **オプション環境変数**: `PDF_SENDER_COMPANY`, `PDF_SENDER_POSTAL_CODE`, `PDF_SENDER_ADDRESS`, `PDF_SENDER_PHONE`, `PDF_SENDER_FAX`
+
+各環境変数の使用箇所と説明を明記。
+
+#### 修正ファイル
+
+- `docs/環境変数設定手順.md`: `.env.local`ファイルの作成手順を詳細化、トラブルシューティングを拡充、使用されている環境変数の完全なリストを追加
+
+#### 確認事項
+
+- ✅ `.env.local`ファイルの作成手順が詳細に記載されている
+- ✅ Supabase Dashboardからの値取得手順が記載されている
+- ✅ 使用されている環境変数の完全なリストが記載されている
+- ✅ ログインできない場合のトラブルシューティングが追加されている
+
+---
+
+## 2026-01-02（環境変数設定とデバッグログの削除）
+
+### 環境変数設定に関する説明の追加
+
+#### 問題
+- ログイン時に「Failed to fetch」エラーが発生
+- エラーメッセージ: `net::ERR_NAME_NOT_RESOLVED`（`https://your-project-id.supabase.co`にアクセスしようとしている）
+
+#### 原因
+- `.env.local`ファイルにプレースホルダー値（`your-project-id.supabase.co`、`your-anon-key`）が残っていた
+- 環境変数が正しく設定されていなかった
+
+#### 解決策
+1. **環境変数の設定手順の確認**
+   - Supabase Dashboard > Project Settings > API から値を取得
+   - `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`を設定
+   - 開発サーバーを再起動（`.env.local`を変更した後は必須）
+
+2. **`AUTO_ORDER_SECRET`の設定方法の説明**
+   - 文字数に制限はない（推奨は64文字程度）
+   - 開発環境なら簡単な文字列でも可（例: `dev-secret-key-12345`）
+   - 本番環境では推測されにくいランダムな文字列を推奨
+
+3. **PDF生成関連の環境変数について**
+   - PDF生成関連の環境変数（`PDF_SENDER_*`）は**オプション**（不要）
+   - システム設定画面（`/admin/settings`）から会社情報を設定することを推奨
+   - 環境変数は、システム設定に値がない場合のフォールバックとして使用される
+
+#### 修正ファイル
+- `docs/環境変数設定手順.md`: 既存のドキュメントを確認（詳細な手順が記載済み）
+
+### デバッグログの削除
+
+#### 問題
+- ログイン後、カレンダーページでログが流れ続け、画面がちらつき操作ができない
+
+#### 原因
+- デバッグ用の`console.log`が複数のファイルに残っていた
+- 特に`app/(user)/calendar/page.tsx`で頻繁にログが出力されていた
+
+#### 解決策
+以下のファイルからデバッグログを削除：
+
+1. **`lib/supabase/client.ts`**
+   - `createClient`関数内のデバッグログを削除
+   - 環境変数のチェックログを削除
+
+2. **`app/(auth)/login/page.tsx`**
+   - `handleLogin`関数内のデバッグログを削除
+   - 環境変数チェック、`signInWithPassword`呼び出し前後のログを削除
+
+3. **`app/(user)/calendar/page.tsx`**
+   - `console.log("=== Calendar Page Debug ===")`とその関連ログを削除
+   - 注文データ取得に関するログを削除
+   - メニューアイテム取得に関する警告ログを削除
+
+#### 修正ファイル
+- `lib/supabase/client.ts`: デバッグログを削除
+- `app/(auth)/login/page.tsx`: デバッグログを削除
+- `app/(user)/calendar/page.tsx`: デバッグログを削除
+
+#### 確認事項
+- ✅ ログインが正常に動作する
+- ✅ カレンダーページでログが流れない
+- ✅ 画面のちらつきが解消される
+- ✅ すべての機能が正常に動作する
+
+---
+
+## 2026-01-02（デバッグログの完全削除）
+
+### 問題
+
+- 新規注文画面でログが流れ続ける
+- 注文ボタンを押したら警告が表示される
+- エラー発生時にログが流れる
+
+### 原因
+
+- 注文関連のコンポーネントとAPIに多数の`console.log`と`console.error`が残っていた
+- 開発時のデバッグログが本番環境でも出力されていた
+
+### 解決策
+
+すべての注文関連ファイルからデバッグログを削除しました。
+
+#### 修正ファイル
+
+1. **`components/order-form.tsx`**
+   - `console.log('Submitting order:', ...)` を削除
+   - `console.log('Response status:', ...)` を削除
+   - `console.log('Response data:', ...)` を削除
+   - `console.log('Order successful, redirecting...')` を削除
+   - `console.error('Order error:', ...)` を削除
+
+2. **`app/(user)/orders/new/page.tsx`**
+   - `console.error('Vendors fetch error:', ...)` を削除
+   - `console.error('Menu items fetch error:', ...)` を削除
+
+3. **`app/api/orders/route.ts`（注文作成API）**
+   - `console.log('Fetching price for menu_id:', ...)` を削除
+   - `console.log('Price fetch result:', ...)` を削除
+   - `console.error('Price fetch error details:', ...)` を削除
+   - `console.error('Price data is null or undefined')` を削除
+   - `console.log('Menu price ID:', ...)` を削除
+   - `console.error('Price info fetch error:', ...)` を削除
+   - `console.error('Existing order check error:', ...)` を削除
+   - `console.error('UNIQUE constraint violation but no ordered order found:', ...)` を削除
+   - `console.error('Order insert error:', ...)` を削除
+   - `console.error('Insert error details:', ...)` を削除
+   - `console.error('Audit log insert error:', ...)` を削除
+   - `console.error('RPC call error:', ...)` を削除
+   - `console.error('Order API error:', ...)` を削除
+
+4. **`app/api/orders/[id]/route.ts`（注文更新・キャンセルAPI）**
+   - `console.log('=== Cancel Order Request ===')` を削除
+   - `console.log('Raw params:', ...)` を削除
+   - `console.log('Parsed orderId:', ...)` を削除
+   - `console.error('Invalid orderId:', ...)` を削除
+   - `console.log('Attempting to cancel order:', ...)` を削除
+   - `console.log('Update result:', ...)` を削除
+   - `console.error('Order cancel error:', ...)` を削除
+   - `console.error('Error details:', ...)` を削除
+   - `console.error('Audit log insert error:', ...)` を削除（2箇所）
+   - `console.error('Order cancel API error:', ...)` を削除
+   - `console.error('Error stack:', ...)` を削除
+   - `console.error('Order update error:', ...)` を削除
+   - `console.error('Order update API error:', ...)` を削除
+
+5. **`components/cancel-order-button.tsx`**
+   - `console.error('Cancel error:', ...)` を削除
+
+6. **`components/order-edit-form.tsx`**
+   - `console.error('Order update error:', ...)` を削除
+   - `console.error('Cancel order error:', ...)` を削除
+   - `console.error('Order cancel error:', ...)` を削除
+
+7. **`app/(user)/orders/[id]/edit/page.tsx`**
+   - `console.error('Vendors fetch error:', ...)` を削除
+   - `console.error('Menu items fetch error:', ...)` を削除
+
+### 確認事項
+
+- ✅ 新規注文画面でログが流れない
+- ✅ 注文ボタンを押しても警告が表示されない
+- ✅ エラー発生時もログが流れない
+- ✅ すべての機能が正常に動作する
+
+---
+
+## 2026-01-02（注文確定時のログ出力問題と画面表示エラーの修正）
+
+### 注文確定時のログ出力問題の修正
+
+#### 問題
+
+- 注文確定ボタンを押すと、コンソールに大量のログが流れる
+- `router.refresh()`が呼ばれると、カレンダーページが再レンダリングされ、そのたびに`createClient()`が呼ばれてログが大量に出力される
+- 注文が正常に確定できない
+
+#### 原因
+
+- `lib/supabase/server.ts`に以前のデバッグセッションで追加されたログが残っていた
+- `router.refresh()`が呼ばれると、カレンダーページが再レンダリングされ、そのたびに`createClient()`が呼ばれてログが大量に出力されていた
+- `components/order-form.tsx`で`router.refresh()`を呼び出していたが、`router.push()`で自動的にリフレッシュされるため不要
+
+#### 解決策
+
+1. **`lib/supabase/server.ts`からデバッグログを削除**
+   - 以前のデバッグセッションで追加されたログを削除
+   - `createClient()`が呼ばれるたびにログが出力されないように修正
+
+2. **`router.refresh()`の削除**
+   - `components/order-form.tsx`から`router.refresh()`を削除
+   - `router.push()`で自動的にリフレッシュされるため不要
+
+3. **すべてのデバッグログの削除**
+   - `components/order-form.tsx`からデバッグログを削除
+   - `app/api/orders/route.ts`からデバッグログを削除
+   - `app/(user)/calendar/page.tsx`からデバッグログを削除
+
+#### 修正ファイル
+
+- `lib/supabase/server.ts`: デバッグログを削除
+- `components/order-form.tsx`: `router.refresh()`を削除、デバッグログを削除
+- `app/api/orders/route.ts`: デバッグログを削除
+- `app/(user)/calendar/page.tsx`: デバッグログを削除
+
+#### 確認事項
+
+- ✅ 注文確定ボタンを押してもログが流れない
+- ✅ 注文が正常に確定できる
+- ✅ カレンダーページへのリダイレクトが正常に動作する
+
+### 画面表示エラーの修正
+
+#### 問題
+
+- カレンダーページにアクセスすると、`ReferenceError: envUrl is not defined`エラーが発生
+- 画面が正常に表示されない
+
+#### 原因
+
+- デバッグログ削除時に、`envUrl`と`envKey`の変数定義も一緒に削除してしまった
+- `createServerClient`で`envUrl`と`envKey`を参照する際に、変数が定義されていないためエラーが発生
+
+#### 解決策
+
+- `lib/supabase/server.ts`に、環境変数から`envUrl`と`envKey`を取得するコードを復元
+
+#### 修正ファイル
+
+- `lib/supabase/server.ts`: `envUrl`と`envKey`の変数定義を復元
+
+#### 確認事項
+
+- ✅ カレンダーページが正常に表示される
+- ✅ すべてのページが正常に表示される
+
+### ユーザー管理画面のデバッグログ削除
+
+#### 問題
+
+- ユーザー管理画面にデバッグログが残っていた
+
+#### 解決策
+
+- `app/admin/users/page.tsx`からデバッグログを削除
+
+#### 修正ファイル
+
+- `app/admin/users/page.tsx`: デバッグログを削除
+
+#### 確認事項
+
+- ✅ ユーザー管理画面でログが流れない
+- ✅ すべての機能が正常に動作する
+
+---
+
 ## 変更履歴の記録ルール
 
 - 日付は `YYYY-MM-DD` 形式で記載

@@ -49,12 +49,6 @@ export default function OrderForm({
     }
 
     try {
-      console.log('Submitting order:', {
-        menu_id: selectedMenuId,
-        order_date: orderDate,
-        quantity,
-      })
-
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
@@ -68,9 +62,7 @@ export default function OrderForm({
         }),
       })
 
-      console.log('Response status:', response.status)
       const data = await response.json()
-      console.log('Response data:', data)
 
       if (!response.ok) {
         setError(data.error || '注文に失敗しました')
@@ -79,12 +71,10 @@ export default function OrderForm({
       }
 
       // 注文成功後、カレンダーページにリダイレクト（管理者モードの場合はuser_idパラメータを保持）
-      console.log('Order successful, redirecting...')
+      // router.refresh()は不要（router.pushで自動的にリフレッシュされる）
       const calendarUrl = targetUserId ? `/calendar?user_id=${targetUserId}` : '/calendar'
       router.push(calendarUrl)
-      router.refresh()
     } catch (err) {
-      console.error('Order error:', err)
       setError('注文処理中にエラーが発生しました: ' + (err instanceof Error ? err.message : 'Unknown error'))
       setLoading(false)
     }

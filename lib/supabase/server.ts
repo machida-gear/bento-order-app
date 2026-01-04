@@ -9,9 +9,12 @@ import { Database } from '../database.types'
 export async function createClient() {
   const cookieStore = await cookies()
 
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    envUrl!,
+    envKey!,
     {
       cookies: {
         getAll() {

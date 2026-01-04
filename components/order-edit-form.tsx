@@ -88,7 +88,6 @@ export default function OrderEditForm({
       router.push(calendarUrl)
       router.refresh()
     } catch (err) {
-      console.error('Order update error:', err)
       setError('注文更新処理中にエラーが発生しました: ' + (err instanceof Error ? err.message : 'Unknown error'))
       setLoading(false)
     }
@@ -114,7 +113,6 @@ export default function OrderEditForm({
       const data = await response.json()
 
       if (!response.ok) {
-        console.error('Cancel order error:', data)
         const errorMessage = data.error || '注文のキャンセルに失敗しました'
         const details = data.details ? `\n詳細: ${data.details}` : ''
         setError(errorMessage + details)
@@ -128,7 +126,6 @@ export default function OrderEditForm({
       router.push(calendarUrl)
       router.refresh()
     } catch (err) {
-      console.error('Order cancel error:', err)
       setError('注文キャンセル処理中にエラーが発生しました: ' + (err instanceof Error ? err.message : 'Unknown error'))
       setLoading(false)
       setShowCancelConfirm(false)
