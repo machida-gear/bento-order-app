@@ -40,7 +40,8 @@ export default async function OrdersPage() {
     .order("order_date", { ascending: false });
 
   // カレンダー情報を取得（締切時間チェック用）
-  const orderDates = orders?.map((order) => order.order_date) || [];
+  const ordersTyped = orders as Array<{ order_date: string; [key: string]: any }> | null
+  const orderDates = ordersTyped?.map((order) => order.order_date) || [];
   const { data: orderDays } = await supabase
     .from("order_calendar")
     .select("target_date, deadline_time")
@@ -48,7 +49,7 @@ export default async function OrdersPage() {
 
   // 日付をキーとしたマップを作成
   const orderDaysMap = new Map(
-    orderDays?.map((day) => [day.target_date, day]) || []
+    ((orderDays as Array<{ target_date: string; deadline_time: string | null }> | null)?.map((day) => [day.target_date, day]) || [])
   );
 
   // 締切時間を過ぎたかどうかを判定する関数
@@ -82,7 +83,7 @@ export default async function OrdersPage() {
 
   // 合計金額を計算（unit_price_snapshotを使用）
   const totalAmount =
-    orders?.reduce((sum, order) => {
+    ordersTyped?.reduce((sum, order) => {
       if (order.status === "ordered" && order.unit_price_snapshot) {
         return sum + order.unit_price_snapshot * order.quantity;
       }
@@ -107,8 +108,8 @@ export default async function OrdersPage() {
 
       {/* 注文一覧 */}
       <div className="space-y-3">
-        {orders && orders.length > 0 ? (
-          orders.map((order) => {
+        {ordersTyped && ordersTyped.length > 0 ? (
+          ordersTyped.map((order) => {
             const date = new Date(order.order_date);
             const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][
               date.getDay()

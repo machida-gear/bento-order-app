@@ -66,9 +66,10 @@ export default function AdminCalendarPage() {
         }
 
         if (data) {
+          const dataTyped = data as { default_deadline_time?: string | null; day_of_week_settings?: any }
           setSystemSettings({
-            default_deadline_time: data.default_deadline_time || '10:00',
-            day_of_week_settings: data.day_of_week_settings || {},
+            default_deadline_time: dataTyped.default_deadline_time || '10:00',
+            day_of_week_settings: dataTyped.day_of_week_settings || {},
           })
         }
       } catch (err) {
@@ -108,8 +109,8 @@ export default function AdminCalendarPage() {
         // Mapに変換
         const daysMap = new Map<string, OrderCalendar>()
         if (data) {
-          data.forEach((day) => {
-            daysMap.set(day.target_date, day)
+          (data as Array<{ target_date: string; [key: string]: any }>).forEach((day) => {
+            daysMap.set(day.target_date, day as OrderCalendar)
           })
         }
 

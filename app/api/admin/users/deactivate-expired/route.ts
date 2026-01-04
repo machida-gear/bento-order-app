@@ -52,9 +52,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 退職済みユーザーを無効化
-    const userIds = expiredUsers.map(u => u.id)
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
+    const expiredUsersTyped = expiredUsers as Array<{ id: string; [key: string]: any }> | null
+    const userIds = expiredUsersTyped?.map(u => u.id) || []
+    const { error: updateError } = await (supabaseAdmin
+      .from('profiles') as any)
       .update({ is_active: false })
       .in('id', userIds)
 
@@ -66,22 +67,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`✅ ${expiredUsers.length}人の退職済みユーザーを無効化しました`)
-    console.log('無効化されたユーザー:', expiredUsers.map(u => ({
+    console.log(`✅ ${expiredUsersTyped?.length || 0}人の退職済みユーザーを無効化しました`)
+    console.log('無効化されたユーザー:', expiredUsersTyped?.map(u => ({
       employee_code: u.employee_code,
       full_name: u.full_name,
       left_date: u.left_date,
-    })))
+    })) || [])
 
     return NextResponse.json({
       success: true,
-      message: `${expiredUsers.length}人の退職済みユーザーを無効化しました`,
-      deactivatedCount: expiredUsers.length,
-      deactivatedUsers: expiredUsers.map(u => ({
+      message: `${expiredUsersTyped?.length || 0}人の退職済みユーザーを無効化しました`,
+      deactivatedCount: expiredUsersTyped?.length || 0,
+      deactivatedUsers: expiredUsersTyped?.map(u => ({
         employee_code: u.employee_code,
         full_name: u.full_name,
         left_date: u.left_date,
-      })),
+      })) || [],
     })
   } catch (error) {
     console.error('Deactivate expired users API error:', error)

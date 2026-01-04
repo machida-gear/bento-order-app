@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -177,14 +178,15 @@ export async function GET(request: NextRequest) {
       .single()
     
     // 送信者情報（会社マスターから取得、なければ環境変数、それもなければ固定値）
-    const senderCompany = companySettings?.company_name || process.env.PDF_SENDER_COMPANY || '●●●●株式会社'
-    const senderPostalCode = companySettings?.company_postal_code || process.env.PDF_SENDER_POSTAL_CODE || '〒100-0000'
+    const companySettingsTyped = companySettings as { company_name?: string | null; company_postal_code?: string | null; company_address1?: string | null; company_address2?: string | null; company_phone?: string | null; company_fax?: string | null; [key: string]: any } | null
+    const senderCompany = companySettingsTyped?.company_name || process.env.PDF_SENDER_COMPANY || '●●●●株式会社'
+    const senderPostalCode = companySettingsTyped?.company_postal_code || process.env.PDF_SENDER_POSTAL_CODE || '〒100-0000'
     
     // 住所を2行で構築（address1とaddress2の両方がある場合は2行、片方のみの場合は1行）
     let senderAddress = ''
-    if (companySettings?.company_address1 || companySettings?.company_address2) {
-      const address1 = companySettings?.company_address1 || ''
-      const address2 = companySettings?.company_address2 || ''
+    if (companySettingsTyped?.company_address1 || companySettingsTyped?.company_address2) {
+      const address1 = companySettingsTyped?.company_address1 || ''
+      const address2 = companySettingsTyped?.company_address2 || ''
       if (address1 && address2) {
         senderAddress = `住所:${address1}\n${address2}`
       } else if (address1) {
@@ -196,12 +198,12 @@ export async function GET(request: NextRequest) {
       senderAddress = process.env.PDF_SENDER_ADDRESS || '住所:東京都千代田区0-1-2●●ビル 1F'
     }
     
-    const senderPhone = companySettings?.company_phone
-      ? `電話: ${companySettings.company_phone}`
+    const senderPhone = companySettingsTyped?.company_phone
+      ? `電話: ${companySettingsTyped.company_phone}`
       : process.env.PDF_SENDER_PHONE || '電話: 00-0000-0000'
     
-    const senderFax = companySettings?.company_fax
-      ? `FAX: ${companySettings.company_fax}`
+    const senderFax = companySettingsTyped?.company_fax
+      ? `FAX: ${companySettingsTyped.company_fax}`
       : process.env.PDF_SENDER_FAX || 'FAX: 00-0000-0000'
 
     // PDFを生成
@@ -398,9 +400,9 @@ export async function GET(request: NextRequest) {
     
     // 住所（2行対応）
     doc.fontSize(10)
-    if (companySettings?.company_address1 || companySettings?.company_address2) {
-      const address1 = companySettings?.company_address1 || ''
-      const address2 = companySettings?.company_address2 || ''
+    if (companySettingsTyped?.company_address1 || companySettingsTyped?.company_address2) {
+      const address1 = companySettingsTyped?.company_address1 || ''
+      const address2 = companySettingsTyped?.company_address2 || ''
       
       if (address1 && address2) {
         // 2行で表示
@@ -577,8 +579,8 @@ export async function GET(request: NextRequest) {
         vendor_id: logData.details.vendor_id,
       })
       
-      const { data: logResult, error: logError } = await supabaseAdmin
-        .from('audit_logs')
+      const { data: logResult, error: logError } = await (supabaseAdmin
+        .from('audit_logs') as any)
         .insert(logData)
         .select()
       
@@ -613,7 +615,7 @@ export async function GET(request: NextRequest) {
     }
 
     // PDFファイルとして返す
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="order_${date}_vendor_${vendorId}.pdf"`,

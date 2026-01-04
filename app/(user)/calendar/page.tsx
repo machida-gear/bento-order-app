@@ -9,9 +9,7 @@ import CalendarGrid from "@/components/calendar-grid";
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams:
-    | Promise<{ year?: string; month?: string; user_id?: string }>
-    | { year?: string; month?: string; user_id?: string };
+  searchParams: Promise<{ year?: string; month?: string; user_id?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -22,9 +20,8 @@ export default async function CalendarPage({
     return null;
   }
 
-  // Next.js 16ではsearchParamsがPromiseの場合があるため、awaitで解決
-  const params =
-    searchParams instanceof Promise ? await searchParams : searchParams;
+  // Next.js 16ではsearchParamsがPromise型のため、awaitで解決
+  const params = await searchParams;
 
   // 管理者権限をチェック（Service Role Keyを使用してRLSをバイパス）
   const { data: currentProfile } = await supabaseAdmin
@@ -33,7 +30,7 @@ export default async function CalendarPage({
     .eq("id", user.id)
     .single();
 
-  const isAdmin = currentProfile?.role === "admin";
+  const isAdmin = (currentProfile as { role?: string } | null)?.role === "admin";
 
   // 対象ユーザーIDを決定（管理者がuser_idパラメータを指定した場合はそれを使用、それ以外は現在のユーザーID）
   let targetUserId = user.id;
@@ -53,7 +50,7 @@ export default async function CalendarPage({
 
     if (profileData) {
       targetUserId = params.user_id;
-      targetProfile = profileData;
+      targetProfile = profileData as { id: string; full_name: string; is_active: boolean };
     }
   }
 
@@ -187,7 +184,7 @@ export default async function CalendarPage({
       if (menuItems && menuItems.length > 0) {
         // メニューIDを文字列に変換してマップを作成（bigint型の比較を確実にするため）
         const menuItemsMap = new Map(
-          menuItems.map((item) => [String(item.id), item])
+          (menuItems as Array<{ id: string | number; name: string; vendor_id: string }>).map((item) => [String(item.id), item])
         );
 
         ordersWithMenu = ordersArray.map((order) => {
@@ -238,7 +235,7 @@ export default async function CalendarPage({
 
   // 日付をキーとしたマップを作成（高速検索用）
   const orderDaysMap = new Map(
-    (orderDays || []).map((day) => [day.target_date, day])
+    ((orderDays || []) as Array<{ target_date: string; is_available: boolean; deadline_time: string | null; note: string | null }>).map((day) => [day.target_date, day])
   );
 
   // 同じ日に複数の注文がある場合、最初の1つを使用（仕様上1日1注文のみ）
@@ -365,7 +362,7 @@ export default async function CalendarPage({
         month={currentMonth}
         orderDaysMap={orderDaysMap}
         ordersMap={ordersMap}
-        maxOrderDaysAhead={systemSettings?.max_order_days_ahead || 30}
+        maxOrderDaysAhead={(systemSettings as { max_order_days_ahead?: number } | null)?.max_order_days_ahead || 30}
         targetUserId={isAdmin && params.user_id ? targetUserId : undefined}
       />
     </div>

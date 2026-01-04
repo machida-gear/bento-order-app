@@ -11,7 +11,7 @@ export default async function EditOrderPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ user_id?: string }> | { user_id?: string }
+  searchParams: Promise<{ user_id?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -27,10 +27,11 @@ export default async function EditOrderPage({
     .eq('id', user.id)
     .single()
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = (currentProfile as { role?: string } | null)?.role === 'admin'
 
-  const resolvedParams = await Promise.resolve(params)
-  const resolvedSearchParams = await Promise.resolve(searchParams)
+  // Next.js 16ではparamsとsearchParamsがPromise型のため、awaitで解決
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
   const orderId = parseInt(resolvedParams.id, 10)
 
   if (isNaN(orderId)) {
@@ -67,25 +68,27 @@ export default async function EditOrderPage({
   }
 
   // 注文日の情報を取得
+  const orderTyped = order as { order_date: string; [key: string]: any }
   const { data: orderDay } = await supabase
     .from('order_calendar')
     .select('*')
-    .eq('target_date', order.order_date)
+    .eq('target_date', orderTyped.order_date)
     .single()
 
-  if (!orderDay || !orderDay.is_available) {
+  const orderDayTyped = orderDay as { is_available: boolean; deadline_time?: string | null } | null
+  if (!orderDayTyped || !orderDayTyped.is_available) {
     redirect('/calendar')
   }
 
   // 締切時刻をチェック
-  const orderDateObj = new Date(order.order_date + 'T00:00:00')
+  const orderDateObj = new Date(orderTyped.order_date + 'T00:00:00')
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const isToday = orderDateObj.getTime() === today.getTime()
 
-  if (isToday && orderDay.deadline_time) {
+  if (isToday && orderDayTyped.deadline_time) {
     const now = new Date()
-    const [hours, minutes] = orderDay.deadline_time.split(':').map(Number)
+    const [hours, minutes] = orderDayTyped.deadline_time.split(':').map(Number)
     const deadline = new Date(today)
     deadline.setHours(hours, minutes, 0, 0)
 
@@ -111,7 +114,7 @@ export default async function EditOrderPage({
   }
 
   // 業者が存在する場合のみメニューを取得
-  const vendorIds = vendors?.map(v => v.id) || []
+  const vendorIds = (vendors as Array<{ id: number | string }> | null)?.map(v => v.id) || []
   let menuItems = null
   let menuItemsError = null
 
@@ -134,9 +137,11 @@ export default async function EditOrderPage({
   }
 
   // 業者別にメニューをグループ化
-  const menusByVendor = new Map<number, typeof menuItems>()
-  menuItems?.forEach((menu) => {
-    const vendorId = menu.vendor_id
+  type MenuItem = { vendor_id: number | string; [key: string]: any }
+  const menusByVendor = new Map() as Map<number, MenuItem[]>
+  (menuItems as MenuItem[] | null)?.forEach((menu) => {
+    const vendorId = typeof menu.vendor_id === 'string' ? parseInt(menu.vendor_id, 10) : menu.vendor_id
+    if (isNaN(vendorId)) return
     if (!menusByVendor.has(vendorId)) {
       menusByVendor.set(vendorId, [])
     }
@@ -150,9 +155,9 @@ export default async function EditOrderPage({
         <h1 className="text-2xl font-bold text-gray-800">✏️ 注文変更</h1>
         <p className="text-gray-500 mt-1">
           {orderDateObj.getFullYear()}年{orderDateObj.getMonth() + 1}月{orderDateObj.getDate()}日
-          {isToday && orderDay.deadline_time && (
+          {isToday && orderDayTyped?.deadline_time && (
             <span className="ml-2 text-sm text-amber-600">
-              （締切: {orderDay.deadline_time}）
+              （締切: {orderDayTyped.deadline_time}）
             </span>
           )}
         </p>
@@ -169,19 +174,19 @@ export default async function EditOrderPage({
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm font-medium text-blue-800 mb-2">現在の注文内容</p>
         <p className="text-sm text-blue-700">
-          {order.menu_items?.name || 'メニュー名不明'} × {order.quantity}
+          {(orderTyped as any).menu_items?.name || 'メニュー名不明'} × {orderTyped.quantity}
         </p>
       </div>
 
       {/* 注文編集フォーム */}
       <OrderEditForm
         orderId={orderId}
-        orderDate={order.order_date}
-        currentMenuId={order.menu_item_id}
-        currentQuantity={order.quantity}
+        orderDate={orderTyped.order_date}
+        currentMenuId={(orderTyped as any).menu_item_id}
+        currentQuantity={orderTyped.quantity}
         vendors={vendors || []}
-        menusByVendor={menusByVendor}
-        deadlineTime={orderDay.deadline_time}
+        menusByVendor={menusByVendor as any}
+        deadlineTime={orderDayTyped?.deadline_time || null}
         targetUserId={isAdmin && targetUserId !== user.id ? targetUserId : undefined}
       />
     </div>

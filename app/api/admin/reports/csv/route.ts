@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -65,8 +66,9 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      periodStartDate = period.start_date
-      periodEndDate = period.end_date
+      const periodTyped = period as { start_date: string; end_date: string; [key: string]: any }
+      periodStartDate = periodTyped.start_date
+      periodEndDate = periodTyped.end_date
     } else if (startDate && endDate) {
       // start_date/end_dateから直接使用
       periodStartDate = startDate
@@ -181,7 +183,7 @@ export async function GET(request: NextRequest) {
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'csv.download',
         target_table: 'orders',

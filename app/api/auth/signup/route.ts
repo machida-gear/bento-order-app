@@ -53,7 +53,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!systemSettings.invitation_code || systemSettings.invitation_code.trim() === '') {
+    const systemSettingsTyped = systemSettings as {
+      invitation_code?: string | null;
+      invitation_code_max_uses?: number | null;
+      invitation_code_used_count?: number | null;
+      [key: string]: any;
+    }
+
+    if (!systemSettingsTyped.invitation_code || systemSettingsTyped.invitation_code.trim() === '') {
       return NextResponse.json(
         { error: '招待コードが設定されていません。管理者に連絡してください。' },
         { status: 403 }
@@ -62,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     // 招待コードの正規化（4桁の数字に統一）
     const normalizedInvitationCode = invitationCode.trim().padStart(4, '0')
-    const normalizedSystemCode = systemSettings.invitation_code.trim().padStart(4, '0')
+    const normalizedSystemCode = systemSettingsTyped.invitation_code.trim().padStart(4, '0')
 
     if (normalizedSystemCode !== normalizedInvitationCode) {
       return NextResponse.json(
@@ -72,10 +79,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 使用回数制限のチェック
-    const maxUses = systemSettings.invitation_code_max_uses
-    const usedCount = systemSettings.invitation_code_used_count || 0
+    const maxUses = systemSettingsTyped.invitation_code_max_uses
+    const usedCount = systemSettingsTyped.invitation_code_used_count || 0
 
-    if (maxUses !== null && usedCount >= maxUses) {
+    if (maxUses !== null && maxUses !== undefined && usedCount >= maxUses) {
       return NextResponse.json(
         { error: '招待コードの使用回数が上限に達しています。管理者に連絡してください。' },
         { status: 403 }
@@ -135,8 +142,8 @@ export async function POST(request: NextRequest) {
     
     console.log('📝 Inserting profile:', JSON.stringify(profileDataToInsert, null, 2))
     
-    const { error: profileError, data: profileData } = await supabaseAdmin
-      .from('profiles')
+    const { error: profileError, data: profileData } = await (supabaseAdmin
+      .from('profiles') as any)
       .insert(profileDataToInsert)
       .select()
 
@@ -161,7 +168,7 @@ export async function POST(request: NextRequest) {
 
     // 管理者に通知（監査ログに記録）
     try {
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: authData.user.id,
         action: 'user.signup.pending',
         target_table: 'profiles',
@@ -181,8 +188,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 招待コードの使用回数をカウントアップ
-    const { error: updateInvitationCodeError } = await supabaseAdmin
-      .from('system_settings')
+    const { error: updateInvitationCodeError } = await (supabaseAdmin
+      .from('system_settings') as any)
       .update({
         invitation_code_used_count: (usedCount || 0) + 1,
       })

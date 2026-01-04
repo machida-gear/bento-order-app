@@ -30,7 +30,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -77,7 +78,8 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -106,8 +108,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data, error } = await supabase
-      .from('vendors')
+    const { data, error } = await (supabase
+      .from('vendors') as any)
       .insert({
         code,
         name,
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'vendor.create',
         target_table: 'vendors',

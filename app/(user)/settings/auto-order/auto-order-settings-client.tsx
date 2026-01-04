@@ -134,8 +134,8 @@ export default function AutoOrderSettingsClient({
 
       if (editingId) {
         // 更新
-        const { error } = await supabase
-          .from('auto_order_templates')
+        const { error } = await (supabase
+          .from('auto_order_templates') as any)
           .update({
             menu_id: formMenuId,
             quantity: formQuantity,
@@ -148,8 +148,8 @@ export default function AutoOrderSettingsClient({
         if (error) throw error
       } else {
         // 新規作成
-        const { error } = await supabase
-          .from('auto_order_templates')
+        const { error } = await (supabase
+          .from('auto_order_templates') as any)
           .insert({
             user_id: user.id,
             menu_id: formMenuId,

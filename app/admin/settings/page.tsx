@@ -57,10 +57,11 @@ export default function AdminSettingsPage() {
 
         if (data) {
           // データが存在する場合は、default_deadline_timeをHH:MM形式に変換
+          const dataTyped = data as { default_deadline_time?: string | null; [key: string]: any }
           const formattedData = {
-            ...data,
-            default_deadline_time: data.default_deadline_time
-              ? data.default_deadline_time.toString().slice(0, 5) // "10:00:00" → "10:00"
+            ...dataTyped,
+            default_deadline_time: dataTyped.default_deadline_time
+              ? dataTyped.default_deadline_time.toString().slice(0, 5) // "10:00:00" → "10:00"
               : '10:00',
           }
           setSettings(formattedData as SystemSettings)
@@ -296,7 +297,7 @@ export default function AdminSettingsPage() {
                         if (value === '' || isNaN(numValue) || numValue < 1 || numValue > 31) {
                           // 無効な値の場合は、現在の値が有効ならそのまま、無効ならデフォルト値（25）に戻す
                           const currentValue = settings.closing_day
-                          if (currentValue >= 1 && currentValue <= 31) {
+                          if (currentValue !== null && currentValue !== undefined && currentValue >= 1 && currentValue <= 31) {
                             // 現在の値が有効な場合はそのまま
                             return
                           }

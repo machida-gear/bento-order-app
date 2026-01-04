@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isAdmin = currentProfile.role === "admin";
+    const currentProfileTyped = currentProfile as { role?: string; is_active?: boolean; left_date?: string | null; [key: string]: any } | null
+    const isAdmin = currentProfileTyped?.role === "admin";
 
     const { menu_id, order_date, quantity, user_id } = await request.json();
 
@@ -56,15 +57,16 @@ export async function POST(request: NextRequest) {
       }
 
       // 注文対象ユーザーの状態チェック
-      if (!targetProfile.is_active) {
+      const targetProfileTyped = targetProfile as { is_active?: boolean; left_date?: string | null; [key: string]: any } | null
+      if (!targetProfileTyped?.is_active) {
         return NextResponse.json(
           { error: "指定されたユーザーのアカウントが無効化されています" },
           { status: 403 }
         );
       }
 
-      if (targetProfile.left_date) {
-        const leftDate = new Date(targetProfile.left_date);
+      if (targetProfileTyped?.left_date) {
+        const leftDate = new Date(targetProfileTyped.left_date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         leftDate.setHours(0, 0, 0, 0);
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // 一般ユーザーの場合、自分の状態をチェック
-      if (!currentProfile.is_active) {
+      if (!currentProfileTyped?.is_active) {
         return NextResponse.json(
           {
             error: "アカウントが無効化されています。管理者に連絡してください。",
@@ -87,8 +89,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (currentProfile.left_date) {
-        const leftDate = new Date(currentProfile.left_date);
+      if (currentProfileTyped?.left_date) {
+        const leftDate = new Date(currentProfileTyped.left_date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         leftDate.setHours(0, 0, 0, 0);
@@ -145,15 +147,16 @@ export async function POST(request: NextRequest) {
       .eq("id", 1)
       .single();
 
+    const systemSettingsTyped = systemSettings as { max_order_days_ahead?: number | null; [key: string]: any } | null
     // 最大注文可能日数をチェック
-    if (systemSettings?.max_order_days_ahead) {
+    if (systemSettingsTyped?.max_order_days_ahead) {
       const diffTime = orderDateObj.getTime() - today.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-      if (diffDays > systemSettings.max_order_days_ahead) {
+      if (diffDays > systemSettingsTyped.max_order_days_ahead) {
         return NextResponse.json(
           {
-            error: `注文可能日数を超えています（最大${systemSettings.max_order_days_ahead}日先まで）`,
+            error: `注文可能日数を超えています（最大${systemSettingsTyped.max_order_days_ahead}日先まで）`,
           },
           { status: 400 }
         );
@@ -167,7 +170,8 @@ export async function POST(request: NextRequest) {
       .eq("target_date", order_date)
       .single();
 
-    if (orderDayError || !orderDay || !orderDay.is_available) {
+    const orderDayTyped = orderDay as { is_available?: boolean; deadline_time?: string | null; [key: string]: any } | null
+    if (orderDayError || !orderDayTyped || !orderDayTyped.is_available) {
       return NextResponse.json(
         { error: "この日は注文できません" },
         { status: 400 }
@@ -176,9 +180,9 @@ export async function POST(request: NextRequest) {
 
     // 今日の場合、締切時刻をチェック
     const isToday = orderDateObj.getTime() === today.getTime();
-    if (isToday && orderDay.deadline_time) {
+    if (isToday && orderDayTyped.deadline_time) {
       const now = new Date();
-      const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
+      const [hours, minutes] = orderDayTyped.deadline_time.split(":").map(Number);
       const deadline = new Date(today);
       deadline.setHours(hours, minutes, 0, 0);
 
@@ -210,7 +214,8 @@ export async function POST(request: NextRequest) {
 
     // 注文済み（ordered）の注文がある場合のみエラー
     // キャンセル済み（canceled）の注文は無視して、新規注文を許可する
-    if (existingOrder && existingOrder.status === "ordered") {
+    const existingOrderTyped = existingOrder as { status?: string; [key: string]: any } | null
+    if (existingOrderTyped && existingOrderTyped.status === "ordered") {
       return NextResponse.json(
         {
           error:
@@ -231,10 +236,11 @@ export async function POST(request: NextRequest) {
       .eq("status", "canceled")
       .eq("menu_item_id", menu_id); // 同じ menu_id のキャンセル済み注文のみ削除
 
-    if (canceledOrders && canceledOrders.length > 0) {
+    const canceledOrdersTyped = canceledOrders as Array<{ id: number; [key: string]: any }> | null
+    if (canceledOrdersTyped && canceledOrdersTyped.length > 0) {
       // キャンセル済みの注文を削除（UNIQUE制約違反を避けるため）
-      for (const canceledOrder of canceledOrders) {
-        await supabaseAdmin.from("orders").delete().eq("id", canceledOrder.id);
+      for (const canceledOrder of canceledOrdersTyped) {
+        await (supabaseAdmin.from("orders") as any).delete().eq("id", canceledOrder.id);
       }
     }
 
@@ -245,7 +251,8 @@ export async function POST(request: NextRequest) {
       .eq("id", menu_id)
       .single();
 
-    if (menuError || !menu || !menu.is_active) {
+    const menuTyped = menu as { is_active?: boolean; [key: string]: any } | null
+    if (menuError || !menuTyped || !menuTyped.is_active) {
       return NextResponse.json(
         { error: "選択されたメニューは存在しないか、無効です" },
         { status: 400 }
@@ -254,13 +261,11 @@ export async function POST(request: NextRequest) {
 
     // 価格ID取得（DB関数を使用）
     try {
-      const { data: priceData, error: priceError } = await supabaseAdmin.rpc(
-        "get_menu_price_id",
-        {
+      const { data: priceData, error: priceError } = await (supabaseAdmin
+        .rpc as any)("get_menu_price_id", {
           p_menu_id: menu_id,
           p_order_date: order_date,
-        }
-      );
+        });
 
       if (priceError) {
         return NextResponse.json(
@@ -294,7 +299,8 @@ export async function POST(request: NextRequest) {
         .eq("id", menu_price_id)
         .single();
 
-      if (priceInfoError || !priceInfo) {
+      const priceInfoTyped = priceInfo as { price: number; [key: string]: any } | null
+      if (priceInfoError || !priceInfoTyped) {
         return NextResponse.json(
           {
             error: "価格情報の取得に失敗しました",
@@ -307,15 +313,15 @@ export async function POST(request: NextRequest) {
       // 注文作成（Service Role Keyを使用してRLSをバイパス）
       // 注意: ordersテーブルのカラム名はmenu_item_id（menu_idではない）
       // unit_price_snapshotとsourceカラムも必須
-      const { error: insertError, data: orderData } = await supabaseAdmin
-        .from("orders")
+      const { error: insertError, data: orderData } = await (supabaseAdmin
+        .from("orders") as any)
         .insert({
           user_id: targetUserId, // 管理者が指定したユーザーIDまたは現在のユーザーID
           menu_item_id: menu_id, // 実際のDBではmenu_item_idカラム名を使用
           menu_price_id,
           order_date: order_date,
           quantity,
-          unit_price_snapshot: priceInfo.price, // 注文時の単価スナップショット
+          unit_price_snapshot: priceInfoTyped.price, // 注文時の単価スナップショット
           status: "ordered",
           source: "manual", // 手動注文（管理者による代行も'manual'として記録）
         })
@@ -334,7 +340,8 @@ export async function POST(request: NextRequest) {
             .eq("status", "ordered")
             .maybeSingle();
 
-          if (orderedOrder && orderedOrder.status === "ordered") {
+          const orderedOrderTyped = orderedOrder as { status?: string; [key: string]: any } | null
+          if (orderedOrderTyped && orderedOrderTyped.status === "ordered") {
             return NextResponse.json(
               {
                 error:
@@ -372,11 +379,12 @@ export async function POST(request: NextRequest) {
       // 注意: audit_logsテーブルのカラム名はactor_id（actor_user_idではない）
       // detailsカラム名を確認（detailではなくdetails）
       try {
-        await supabaseAdmin.from("audit_logs").insert({
+        const orderDataTyped = orderData as { id: number; [key: string]: any }
+        await (supabaseAdmin.from("audit_logs") as any).insert({
           actor_id: user.id, // 実際に操作したユーザー（管理者）
           action: isAdmin && user_id ? "order.create.admin" : "order.create",
           details: {
-            order_id: orderData.id,
+            order_id: orderDataTyped.id,
             menu_item_id: menu_id,
             order_date,
             quantity,
@@ -384,7 +392,7 @@ export async function POST(request: NextRequest) {
             ...(isAdmin && user_id ? { created_by_admin: true } : {}),
           },
           target_table: "orders",
-          target_id: orderData.id.toString(),
+          target_id: orderDataTyped.id.toString(),
         });
       } catch (auditLogError) {
         // 監査ログの記録エラーは無視（注文は成功しているため）

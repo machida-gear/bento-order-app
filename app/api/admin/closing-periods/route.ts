@@ -25,7 +25,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 

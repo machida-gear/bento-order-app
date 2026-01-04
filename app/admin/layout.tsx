@@ -30,7 +30,8 @@ export default async function AdminLayout({
   }
 
   // 管理者権限チェック
-  if (profile.role !== 'admin') {
+  const profileTyped = profile as { role?: string; [key: string]: any }
+  if (profileTyped.role !== 'admin') {
     redirect('/calendar')
   }
 

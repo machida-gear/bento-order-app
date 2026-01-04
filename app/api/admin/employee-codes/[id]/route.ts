@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -30,11 +30,13 @@ export async function PUT(
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
-    const id = parseInt(params.id, 10)
+    const resolvedParams = await Promise.resolve(params)
+    const id = parseInt(resolvedParams.id, 10)
     if (isNaN(id)) {
       return NextResponse.json({ error: '無効なIDです' }, { status: 400 })
     }
@@ -72,7 +74,8 @@ export async function PUT(
     }
 
     // 登録済みの場合は編集不可
-    if (existing.is_registered) {
+    const existingTyped = existing as { is_registered?: boolean; [key: string]: any } | null
+    if (existingTyped?.is_registered) {
       return NextResponse.json(
         { error: '登録済みの社員コードは編集できません' },
         { status: 400 }
@@ -83,7 +86,7 @@ export async function PUT(
     const normalizedEmployeeCode = employee_code.trim().padStart(4, '0')
 
     // 社員コードの重複チェック（自分以外）
-    if (normalizedEmployeeCode !== existing.employee_code) {
+    if (normalizedEmployeeCode !== existingTyped?.employee_code) {
       const { data: duplicate } = await supabaseAdmin
         .from('employee_codes')
         .select('id')
@@ -100,8 +103,8 @@ export async function PUT(
     }
 
     // 社員コードマスターを更新
-    const { data, error } = await supabaseAdmin
-      .from('employee_codes')
+    const { data, error } = await (supabaseAdmin
+      .from('employee_codes') as any)
       .update({
         employee_code: normalizedEmployeeCode,
         full_name: full_name.trim(),
@@ -123,7 +126,7 @@ export async function PUT(
       const headersList = await request.headers
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'employee_code.update',
         target_table: 'employee_codes',
@@ -132,8 +135,8 @@ export async function PUT(
           employee_code: normalizedEmployeeCode,
           full_name: full_name.trim(),
           previous: {
-            employee_code: existing.employee_code,
-            full_name: existing.full_name,
+            employee_code: existingTyped?.employee_code,
+            full_name: existingTyped?.full_name,
           },
         },
         ip_address: ipAddress,
@@ -159,7 +162,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -176,11 +179,13 @@ export async function DELETE(
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
-    const id = parseInt(params.id, 10)
+    const resolvedParams = await Promise.resolve(params)
+    const id = parseInt(resolvedParams.id, 10)
     if (isNaN(id)) {
       return NextResponse.json({ error: '無効なIDです' }, { status: 400 })
     }
@@ -200,7 +205,8 @@ export async function DELETE(
     }
 
     // 登録済みの場合は削除不可
-    if (existing.is_registered) {
+    const existingTypedDelete = existing as { is_registered?: boolean; employee_code?: string; full_name?: string; [key: string]: any } | null
+    if (existingTypedDelete?.is_registered) {
       return NextResponse.json(
         { error: '登録済みの社員コードは削除できません' },
         { status: 400 }
@@ -226,14 +232,14 @@ export async function DELETE(
       const headersList = await request.headers
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'employee_code.delete',
         target_table: 'employee_codes',
         target_id: id.toString(),
         details: {
-          employee_code: existing.employee_code,
-          full_name: existing.full_name,
+          employee_code: existingTypedDelete?.employee_code,
+          full_name: existingTypedDelete?.full_name,
         },
         ip_address: ipAddress,
       })

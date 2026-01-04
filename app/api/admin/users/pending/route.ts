@@ -29,14 +29,15 @@ export async function GET() {
       )
     }
 
-    if (profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json(
         { error: '管理者権限が必要です' },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       return NextResponse.json(
         { error: 'アカウントが無効化されています' },
         { status: 403 }
@@ -62,7 +63,8 @@ export async function GET() {
       .or(`left_date.is.null,left_date.gte.${tomorrowStr}`)
       .order('created_at', { ascending: false })
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/pending/route.ts:62',message:'GET pending: Results',data:{count:data?.length,users:data?.map(u=>({id:u.id,employee_code:u.employee_code,is_active:u.is_active,left_date:u.left_date}))},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
+    const dataTyped = data as Array<{ id: string; employee_code?: string; is_active?: boolean; left_date?: string | null; [key: string]: any }> | null
+    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/pending/route.ts:62',message:'GET pending: Results',data:{count:dataTyped?.length,users:dataTyped?.map(u=>({id:u.id,employee_code:u.employee_code,is_active:u.is_active,left_date:u.left_date}))},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
     if (error) {

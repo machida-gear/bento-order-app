@@ -32,7 +32,8 @@ export default async function TodayOrdersPage({
     .eq('id', user.id)
     .single()
 
-  if (currentProfile?.role !== 'admin') {
+  const profileTyped = currentProfile as { role?: string; [key: string]: any } | null
+  if (profileTyped?.role !== 'admin') {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">

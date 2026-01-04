@@ -41,7 +41,8 @@ export async function PUT(
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -71,8 +72,8 @@ export async function PUT(
       )
     }
 
-    const { data, error } = await supabase
-      .from('vendors')
+    const { data, error } = await (supabase
+      .from('vendors') as any)
       .update({
         code,
         name,
@@ -95,7 +96,7 @@ export async function PUT(
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'vendor.update',
         target_table: 'vendors',
@@ -156,13 +157,14 @@ export async function DELETE(
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
     // is_active=falseに設定（物理削除ではない）
-    const { data, error } = await supabase
-      .from('vendors')
+    const { data, error } = await (supabase
+      .from('vendors') as any)
       .update({ is_active: false })
       .eq('id', id)
       .select()
@@ -181,7 +183,7 @@ export async function DELETE(
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'vendor.delete',
         target_table: 'vendors',

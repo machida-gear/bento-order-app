@@ -1,4 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# お弁当注文 Web アプリケーション
+
+Next.js 16.1.1 (App Router) と Supabase を使用した社員向けお弁当注文システムです。
+
+> 📖 **ドキュメント**: [docs/README.md](./docs/README.md) を参照してください。すべてのドキュメントへの参照と分類が記載されています。
+
+---
+
+## プロジェクト概要
+
+このプロジェクトは、社員がお弁当を注文するための Web アプリケーションです。
+
+### 主な機能
+
+- ユーザー認証（ログイン・新規登録）
+- 注文カレンダー（注文可能日の表示・注文作成）
+- 注文管理（注文一覧・編集・キャンセル）
+- 自動注文機能（曜日別パターン設定）
+- 管理者機能（ユーザー管理・メニュー管理・価格管理・レポート）
+
+### 技術スタック
+
+- **フレームワーク**: Next.js 16.1.1 (App Router)
+- **言語**: TypeScript
+- **スタイリング**: Tailwind CSS
+- **データベース**: Supabase (PostgreSQL)
+- **認証**: Supabase Auth
+- **デプロイ**: Vercel
+
+---
+
+## ドキュメント
+
+### 基本ドキュメント
+
+- **[docs/README.md](./docs/README.md)** - すべてのドキュメントへの参照と分類
+- **[docs/CHANGELOG.md](./docs/CHANGELOG.md)** - 変更履歴
+- **[docs/DECISIONS.md](./docs/DECISIONS.md)** - 設計判断
+- **[docs/PROGRESS.md](./docs/PROGRESS.md)** - 進捗状況
+- **[docs/SPEC.md](./docs/SPEC.md)** - システム仕様書
+- **[docs/TODO.md](./docs/TODO.md)** - 実装タスク一覧
+
+### 最新の変更
+
+- **[Next.js16型エラー修正とVercelデプロイ対応.md](./docs/Next.js16型エラー修正とVercelデプロイ対応.md)** - Next.js 16.1.1 の型エラー修正と Vercel デプロイ対応
+
+---
 
 ## Getting Started
 

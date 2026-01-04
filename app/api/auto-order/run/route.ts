@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
         .eq('target_date', checkDateStr)
         .single()
 
-      if (orderDay && orderDay.is_available) {
+      const orderDayTyped = orderDay as { is_available?: boolean; [key: string]: any } | null
+      if (orderDayTyped && orderDayTyped.is_available) {
         targetDate = checkDateStr
         targetDateObj = checkDate
         break
@@ -65,8 +66,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 実行履歴を作成
-    const { data: runRecord, error: runError } = await supabaseAdmin
-      .from('auto_order_runs')
+    const { data: runRecord, error: runError } = await (supabaseAdmin
+      .from('auto_order_runs') as any)
       .insert({
         run_date: todayStr,
         executed_at: jstNow.toISOString(),
@@ -102,10 +103,12 @@ export async function POST(request: NextRequest) {
       throw usersError
     }
 
-    if (!users || users.length === 0) {
+    const usersTyped = users as Array<{ id: string; [key: string]: any }> | null
+
+    if (!usersTyped || usersTyped.length === 0) {
       // 実行履歴を更新
-      await supabaseAdmin
-        .from('auto_order_runs')
+      await (supabaseAdmin
+        .from('auto_order_runs') as any)
         .update({
           status: 'completed',
           log_details: {
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest) {
     }> = []
 
     // 各ユーザーに対して自動注文を実行
-    for (const user of users) {
+    for (const user of usersTyped) {
       try {
         // 対象日の既存注文をチェック
         const { data: existingOrder } = await supabaseAdmin
@@ -165,8 +168,10 @@ export async function POST(request: NextRequest) {
           throw templatesError
         }
 
+        const templatesTyped = templates as Array<{ day_of_week?: number | null; menu_id: number; [key: string]: any }> | null
+
         // テンプレートがない場合はスキップ
-        if (!templates || templates.length === 0) {
+        if (!templatesTyped || templatesTyped.length === 0) {
           results.push({
             user_id: user.id,
             result: 'skipped',
@@ -176,8 +181,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 優先順位: 特定の曜日のテンプレート > 毎日テンプレート
-        const specificDayTemplate = templates.find(t => t.day_of_week === dayOfWeek)
-        const template = specificDayTemplate || templates.find(t => t.day_of_week === null)
+        const specificDayTemplate = templatesTyped.find(t => t.day_of_week === dayOfWeek)
+        const template = specificDayTemplate || templatesTyped.find(t => t.day_of_week === null)
 
         if (!template) {
           results.push({
@@ -189,13 +194,15 @@ export async function POST(request: NextRequest) {
         }
 
         // メニューの存在確認
+        const templateTyped = template as { menu_id: number; quantity?: number; id?: number; [key: string]: any }
         const { data: menu, error: menuError } = await supabaseAdmin
           .from('menu_items')
           .select('id, is_active, vendor_id')
-          .eq('id', template.menu_id)
+          .eq('id', templateTyped.menu_id)
           .single()
 
-        if (menuError || !menu || !menu.is_active) {
+        const menuTyped = menu as { is_active?: boolean; [key: string]: any } | null
+        if (menuError || !menuTyped || !menuTyped.is_active) {
           results.push({
             user_id: user.id,
             result: 'error',
@@ -205,9 +212,9 @@ export async function POST(request: NextRequest) {
         }
 
         // 価格ID取得
-        const { data: priceId, error: priceError } = await supabaseAdmin
-          .rpc('get_menu_price_id', {
-            p_menu_id: template.menu_id,
+        const { data: priceId, error: priceError } = await (supabaseAdmin
+          .rpc as any)('get_menu_price_id', {
+            p_menu_id: templateTyped.menu_id,
             p_order_date: targetDate,
           })
 
@@ -227,7 +234,8 @@ export async function POST(request: NextRequest) {
           .eq('id', priceId)
           .single()
 
-        if (priceInfoError || !priceInfo) {
+        const priceInfoTyped = priceInfo as { price: number; [key: string]: any } | null
+        if (priceInfoError || !priceInfoTyped) {
           results.push({
             user_id: user.id,
             result: 'error',
@@ -237,15 +245,15 @@ export async function POST(request: NextRequest) {
         }
 
         // 注文を作成
-        const { error: orderError, data: orderData } = await supabaseAdmin
-          .from('orders')
+        const { error: orderError, data: orderData } = await (supabaseAdmin
+          .from('orders') as any)
           .insert({
             user_id: user.id,
-            menu_item_id: template.menu_id,
+            menu_item_id: templateTyped.menu_id,
             menu_price_id: priceId,
             order_date: targetDate,
-            quantity: template.quantity,
-            unit_price_snapshot: priceInfo.price,
+            quantity: templateTyped.quantity || 1,
+            unit_price_snapshot: priceInfoTyped.price,
             status: 'ordered',
             source: 'auto',
           })
@@ -272,28 +280,30 @@ export async function POST(request: NextRequest) {
 
         // 監査ログ記録
         try {
-          await supabaseAdmin.from('audit_logs').insert({
+          const orderDataTyped = orderData as { id: number; [key: string]: any }
+          await (supabaseAdmin.from('audit_logs') as any).insert({
             actor_id: user.id,
             action: 'order.create.auto',
             details: {
-              order_id: orderData.id,
-              menu_item_id: template.menu_id,
+              order_id: orderDataTyped.id,
+              menu_item_id: templateTyped.menu_id,
               order_date: targetDate,
-              quantity: template.quantity,
-              template_id: template.id,
+              quantity: templateTyped.quantity || 1,
+              template_id: templateTyped.id,
             },
             target_table: 'orders',
-            target_id: orderData.id.toString(),
+            target_id: orderDataTyped.id.toString(),
           })
         } catch (auditLogError) {
           // 監査ログの記録エラーは無視
           console.error('Audit log insert error:', auditLogError)
         }
 
+        const orderDataTyped = orderData as { id: number; [key: string]: any }
         results.push({
           user_id: user.id,
           result: 'created',
-          detail: `注文を作成しました（注文ID: ${orderData.id}）`,
+          detail: `注文を作成しました（注文ID: ${orderDataTyped.id}）`,
         })
       } catch (error) {
         console.error(`Error processing user ${user.id}:`, error)
@@ -308,7 +318,7 @@ export async function POST(request: NextRequest) {
     // 実行履歴アイテムを記録
     for (const result of results) {
       try {
-        await supabaseAdmin.from('auto_order_run_items').insert({
+        await (supabaseAdmin.from('auto_order_run_items') as any).insert({
           run_id: runId,
           user_id: result.user_id,
           target_date: targetDate,
@@ -317,7 +327,8 @@ export async function POST(request: NextRequest) {
         })
       } catch (itemError) {
         // UNIQUE制約違反の場合は無視（レースコンディション）
-        if (itemError.code !== '23505') {
+        const itemErrorTyped = itemError as { code?: string; [key: string]: any }
+        if (itemErrorTyped.code !== '23505') {
           console.error('Failed to insert run item:', itemError)
         }
       }
@@ -328,8 +339,8 @@ export async function POST(request: NextRequest) {
     const skippedCount = results.filter(r => r.result === 'skipped').length
     const errorCount = results.filter(r => r.result === 'error').length
 
-    await supabaseAdmin
-      .from('auto_order_runs')
+    await (supabaseAdmin
+      .from('auto_order_runs') as any)
       .update({
         status: 'completed',
         log_details: {

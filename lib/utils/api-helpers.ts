@@ -39,7 +39,8 @@ export async function checkAdminPermission(userId: string): Promise<boolean> {
     return false
   }
 
-  return profile.role === 'admin'
+  const profileTyped = profile as { role?: string; [key: string]: any } | null
+  return profileTyped?.role === 'admin'
 }
 
 /**
@@ -90,9 +91,10 @@ export async function checkUserActive(userId: string): Promise<{
     )
   }
 
+  const profileTyped = profile as { is_active?: boolean; left_date?: string | null; [key: string]: any } | null
   return {
-    isActive: profile.is_active,
-    leftDate: profile.left_date,
+    isActive: profileTyped?.is_active ?? false,
+    leftDate: profileTyped?.left_date ?? null,
   }
 }
 

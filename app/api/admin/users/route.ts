@@ -49,15 +49,16 @@ export async function GET() {
       )
     }
 
-    if (profile.role !== 'admin') {
-      console.error('User is not admin. Role:', profile.role)
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
+      console.error('User is not admin. Role:', profileTyped?.role)
       return NextResponse.json(
-        { error: '管理者権限が必要です。現在の権限: ' + profile.role },
+        { error: '管理者権限が必要です。現在の権限: ' + (profileTyped?.role || 'unknown') },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       console.error('User is not active')
       return NextResponse.json(
         { error: 'アカウントが無効化されています。管理者に連絡してください。' },
@@ -133,15 +134,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (profile.role !== 'admin') {
-      console.error('User is not admin. Role:', profile.role)
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
+      console.error('User is not admin. Role:', profileTyped?.role)
       return NextResponse.json(
-        { error: '管理者権限が必要です。現在の権限: ' + profile.role },
+        { error: '管理者権限が必要です。現在の権限: ' + (profileTyped?.role || 'unknown') },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       console.error('User is not active')
       return NextResponse.json(
         { error: 'アカウントが無効化されています。管理者に連絡してください。' },

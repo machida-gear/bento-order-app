@@ -27,7 +27,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -46,12 +47,13 @@ export async function GET() {
       )
     }
 
+    const dataTyped = data as { invitation_code?: string | null; invitation_code_max_uses?: number | null; invitation_code_used_count?: number; [key: string]: any } | null
     return NextResponse.json({ 
       success: true, 
       data: {
-        invitation_code: data?.invitation_code || null,
-        invitation_code_max_uses: data?.invitation_code_max_uses ?? null,
-        invitation_code_used_count: data?.invitation_code_used_count || 0,
+        invitation_code: dataTyped?.invitation_code || null,
+        invitation_code_max_uses: dataTyped?.invitation_code_max_uses ?? null,
+        invitation_code_used_count: dataTyped?.invitation_code_used_count || 0,
       }
     })
   } catch (error) {
@@ -83,7 +85,8 @@ export async function PUT(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -117,10 +120,12 @@ export async function PUT(request: NextRequest) {
       .eq('id', 1)
       .single()
 
+    const currentSettingsTyped = currentSettings as { invitation_code?: string | null; [key: string]: any } | null
+
     // 招待コードが変更された場合、使用回数をリセット
     let shouldResetUsageCount = false
     if (invitation_code !== undefined) {
-      const currentCode = currentSettings?.invitation_code?.trim() || ''
+      const currentCode = currentSettingsTyped?.invitation_code?.trim() || ''
       const newCode = invitation_code?.toString().trim() || ''
       if (currentCode !== newCode) {
         shouldResetUsageCount = true
@@ -142,8 +147,8 @@ export async function PUT(request: NextRequest) {
       updateData.invitation_code_used_count = 0
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('system_settings')
+    const { data, error } = await (supabaseAdmin
+      .from('system_settings') as any)
       .update(updateData)
       .eq('id', 1)
       .select('invitation_code, invitation_code_max_uses, invitation_code_used_count')
@@ -158,21 +163,23 @@ export async function PUT(request: NextRequest) {
     }
 
     // 監査ログ記録
+    // currentSettingsTypedをtryブロックの外で定義済みなので、ここで使用可能
+    const previousInvitationCode = currentSettingsTyped?.invitation_code || null
     try {
       const headersList = await request.headers
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'invitation_code.update',
         target_table: 'system_settings',
         target_id: '1',
         details: {
-          invitation_code: data?.invitation_code || null,
-          invitation_code_max_uses: data?.invitation_code_max_uses ?? null,
-          invitation_code_used_count: data?.invitation_code_used_count || 0,
+          invitation_code: (data as any)?.invitation_code || null,
+          invitation_code_max_uses: (data as any)?.invitation_code_max_uses ?? null,
+          invitation_code_used_count: (data as any)?.invitation_code_used_count || 0,
           previous: {
-            invitation_code: currentSettings?.invitation_code || null,
+            invitation_code: previousInvitationCode,
           },
           usage_count_reset: shouldResetUsageCount,
         },

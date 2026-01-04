@@ -56,15 +56,16 @@ export async function PUT(
       )
     }
 
-    if (profile.role !== 'admin') {
-      console.error('User is not admin. Role:', profile.role)
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
+      console.error('User is not admin. Role:', profileTyped?.role)
       return NextResponse.json(
-        { error: '管理者権限が必要です。現在の権限: ' + profile.role },
+        { error: '管理者権限が必要です。現在の権限: ' + (profileTyped?.role || 'unknown') },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       console.error('User is not active')
       return NextResponse.json(
         { error: 'アカウントが無効化されています。管理者に連絡してください。' },
@@ -105,7 +106,8 @@ export async function PUT(
       )
     }
 
-    const oldEmployeeCode = currentUser.employee_code
+    const currentUserTyped = currentUser as { employee_code: string; [key: string]: any }
+    const oldEmployeeCode = currentUserTyped.employee_code
     const newEmployeeCode = employee_code.trim().padStart(4, '0')
 
     // 社員コードが変更される場合のみ処理
@@ -132,9 +134,10 @@ export async function PUT(
         .eq('employee_code', newEmployeeCode)
         .maybeSingle()
 
-      if (newEmployeeCodeMaster) {
+      const newEmployeeCodeMasterTyped = newEmployeeCodeMaster as { id: number; is_registered: boolean; [key: string]: any } | null
+      if (newEmployeeCodeMasterTyped) {
         // employee_codesテーブルに存在する場合、未登録のみ許可
-        if (newEmployeeCodeMaster.is_registered) {
+        if (newEmployeeCodeMasterTyped.is_registered) {
           return NextResponse.json(
             { error: 'この社員コードは既に登録済みです' },
             { status: 409 }
@@ -150,26 +153,27 @@ export async function PUT(
           .eq('employee_code', oldEmployeeCode)
           .maybeSingle()
 
-        if (oldEmployeeCodeMaster) {
-          await supabaseAdmin
-            .from('employee_codes')
+        const oldEmployeeCodeMasterTyped = oldEmployeeCodeMaster as { id: number; [key: string]: any } | null
+        if (oldEmployeeCodeMasterTyped) {
+          await (supabaseAdmin
+            .from('employee_codes') as any)
             .update({
               is_registered: false,
               registered_user_id: null,
             })
-            .eq('id', oldEmployeeCodeMaster.id)
+            .eq('id', oldEmployeeCodeMasterTyped.id)
         }
       }
 
       // 新しい社員コードをemployee_codesテーブルで登録済みに更新（存在する場合）
-      if (newEmployeeCodeMaster) {
-        await supabaseAdmin
-          .from('employee_codes')
+      if (newEmployeeCodeMasterTyped) {
+        await (supabaseAdmin
+          .from('employee_codes') as any)
           .update({
             is_registered: true,
             registered_user_id: id,
           })
-          .eq('id', newEmployeeCodeMaster.id)
+          .eq('id', newEmployeeCodeMasterTyped.id)
       }
     }
 
@@ -191,8 +195,8 @@ export async function PUT(
     }
 
     // Service Role Keyを使用して更新（RLSをバイパス）
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
+    const { data, error } = await (supabaseAdmin
+      .from('profiles') as any)
       .update({
         employee_code: newEmployeeCode,
         full_name,
@@ -237,7 +241,7 @@ export async function PUT(
         logDetails.employee_code_changed = true
       }
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'user.update',
         target_table: 'profiles',
@@ -314,15 +318,16 @@ export async function DELETE(
       )
     }
 
-    if (profile.role !== 'admin') {
-      console.error('User is not admin. Role:', profile.role)
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
+      console.error('User is not admin. Role:', profileTyped?.role)
       return NextResponse.json(
-        { error: '管理者権限が必要です。現在の権限: ' + profile.role },
+        { error: '管理者権限が必要です。現在の権限: ' + (profileTyped?.role || 'unknown') },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       console.error('User is not active')
       return NextResponse.json(
         { error: 'アカウントが無効化されています。管理者に連絡してください。' },
@@ -369,8 +374,8 @@ export async function DELETE(
     // is_active=false、left_date=今日の日付に設定（物理削除ではない）
     // 注文データは保持されるため、会計・集計に影響なし
     // Service Role Keyを使用して更新（RLSをバイパス）
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
+    const { data, error } = await (supabaseAdmin
+      .from('profiles') as any)
       .update({ 
         is_active: false,
         left_date: todayStr  // 今日の日付を設定
@@ -395,7 +400,7 @@ export async function DELETE(
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'user.delete',
         target_table: 'profiles',

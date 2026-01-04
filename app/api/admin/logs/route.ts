@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (profile.role !== "admin") {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== "admin") {
       return NextResponse.json(
         { error: "管理者権限が必要です" },
         { status: 403 }
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // ユーザー情報を取得して結合
     const logsWithActor = await Promise.all(
-      (logs || []).map(async (log) => {
+      ((logs as Array<{ actor_id?: string; [key: string]: any }> | null) || []).map(async (log) => {
         if (!log.actor_id) {
           return { ...log, actor: null };
         }

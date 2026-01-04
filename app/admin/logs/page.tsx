@@ -61,7 +61,8 @@ export default function AdminLogsPage() {
           return;
         }
 
-        if (profileData.role !== "admin") {
+        const profileTyped = profileData as { role?: string; [key: string]: any }
+        if (profileTyped.role !== "admin") {
           router.push("/calendar");
           return;
         }

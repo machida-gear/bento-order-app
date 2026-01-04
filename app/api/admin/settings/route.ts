@@ -28,7 +28,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin' || !profileTyped.is_active) {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -76,7 +77,8 @@ export async function PUT(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin' || !profileTyped.is_active) {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -128,22 +130,23 @@ export async function PUT(request: NextRequest) {
     let hasDeadlineTimeChanged = false
     if (default_deadline_time) {
       // データベースの時刻をHH:MM形式に変換（HH:MM:SS → HH:MM）
-      const currentTimeFormatted = currentSettings?.default_deadline_time
-        ? currentSettings.default_deadline_time.toString().slice(0, 5) // "10:00:00" → "10:00"
+      const currentSettingsTyped = currentSettings as { default_deadline_time?: string | null; [key: string]: any } | null
+      const currentTimeFormatted = currentSettingsTyped?.default_deadline_time
+        ? currentSettingsTyped.default_deadline_time.toString().slice(0, 5) // "10:00:00" → "10:00"
         : null
       
       hasDeadlineTimeChanged = currentTimeFormatted !== default_deadline_time
       
       console.log('=== Deadline Time Change Check ===')
-      console.log('Current DB value:', currentSettings?.default_deadline_time)
+      console.log('Current DB value:', currentSettingsTyped?.default_deadline_time)
       console.log('Current formatted:', currentTimeFormatted)
       console.log('New value:', default_deadline_time)
       console.log('Has changed:', hasDeadlineTimeChanged)
     }
 
     // システム設定を更新（Service Role Keyを使用）
-    const { data, error } = await supabaseAdmin
-      .from('system_settings')
+    const { data, error } = await (supabaseAdmin
+      .from('system_settings') as any)
       .update({
         default_deadline_time: default_deadline_time || undefined,
         closing_day: closing_day !== undefined ? closing_day : undefined,
@@ -203,8 +206,8 @@ export async function PUT(request: NextRequest) {
       console.log('- deadline_time IS NOT NULL')
       console.log('- new deadline_time:', defaultDeadlineTimeFormatted)
       
-      const { data: updatedRecords, error: calendarUpdateError } = await supabaseAdmin
-        .from('order_calendar')
+      const { data: updatedRecords, error: calendarUpdateError } = await (supabaseAdmin
+        .from('order_calendar') as any)
         .update({ deadline_time: defaultDeadlineTimeFormatted })
         .gte('target_date', todayStr)
         .not('deadline_time', 'is', null)
@@ -217,7 +220,7 @@ export async function PUT(request: NextRequest) {
       } else {
         console.log(`注文カレンダーの締切時刻を更新しました（${updatedRecords?.length || 0}件のレコード）`)
         if (updatedRecords && updatedRecords.length > 0) {
-          console.log('Updated records:', updatedRecords.slice(0, 5).map(r => ({
+          console.log('Updated records:', (updatedRecords as Array<{ target_date: string; deadline_time: string | null; [key: string]: any }>).slice(0, 5).map((r: any) => ({
             target_date: r.target_date,
             deadline_time: r.deadline_time,
           })))
@@ -230,7 +233,7 @@ export async function PUT(request: NextRequest) {
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'settings.update',
         target_table: 'system_settings',

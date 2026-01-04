@@ -27,7 +27,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -83,7 +84,8 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
@@ -123,8 +125,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 社員コードマスターを作成
-    const { data, error } = await supabaseAdmin
-      .from('employee_codes')
+    const { data, error } = await (supabaseAdmin
+      .from('employee_codes') as any)
       .insert({
         employee_code: normalizedEmployeeCode,
         full_name: full_name.trim(),
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
       const headersList = await request.headers
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'employee_code.create',
         target_table: 'employee_codes',

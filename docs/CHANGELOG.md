@@ -6,6 +6,62 @@
 
 ---
 
+## 2025-01-XX（Next.js 16.1.1 型エラー修正と Vercel デプロイ対応）
+
+### Next.js 16.1.1 の型システム変更への対応
+
+- **Route Handlers**: `params` が `Promise<{ id: string }>` 型に変更されたため、すべての動的ルートの Route Handlers を修正
+- **Page Components**: `searchParams` が `Promise` 型に変更されたため、すべての Page Components を修正
+- **型アサーション**: Supabase クエリ結果が `never` 型として推論される問題を解決するため、型アサーションを追加
+
+### 修正内容
+
+- **34 ファイル**を修正
+  - API Routes: 23 ファイル
+  - Page Components: 11 ファイル
+  - Utility Functions: 1 ファイル
+
+### 主な修正パターン
+
+1. **`params` の Promise 型対応**
+   ```typescript
+   // 修正前
+   { params }: { params: { id: string } }
+   
+   // 修正後
+   { params }: { params: Promise<{ id: string }> }
+   const resolvedParams = await Promise.resolve(params);
+   ```
+
+2. **`searchParams` の Promise 型対応**
+   ```typescript
+   // 修正前
+   searchParams: { year?: string; month?: string }
+   
+   // 修正後
+   searchParams: Promise<{ year?: string; month?: string }>
+   const params = searchParams instanceof Promise ? await searchParams : searchParams;
+   ```
+
+3. **型アサーションの追加**
+   ```typescript
+   const profileTyped = profile as { 
+     role?: string; 
+     is_active?: boolean; 
+     [key: string]: any 
+   } | null;
+   ```
+
+### 結果
+
+- すべての TypeScript 型エラーを解消
+- Vercel へのデプロイが成功
+- ビルドが正常に完了
+
+> 📖 **詳細**: [Next.js16型エラー修正とVercelデプロイ対応.md](./Next.js16型エラー修正とVercelデプロイ対応.md)
+
+---
+
 ## 2025-01-XX（初期実装）
 
 ### データベーススキーマの確定

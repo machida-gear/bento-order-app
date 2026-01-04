@@ -9,7 +9,7 @@ import OrderForm from '@/components/order-form'
 export default async function NewOrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; user_id?: string }> | { date?: string; user_id?: string }
+  searchParams: Promise<{ date?: string; user_id?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,10 +25,10 @@ export default async function NewOrderPage({
     .eq('id', user.id)
     .single()
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = (currentProfile as { role?: string } | null)?.role === 'admin'
 
-  // searchParamsがPromiseの場合を考慮
-  const resolvedSearchParams = await Promise.resolve(searchParams)
+  // Next.js 16ではsearchParamsがPromise型のため、awaitで解決
+  const resolvedSearchParams = await searchParams
   const orderDate = resolvedSearchParams.date
   const targetUserId = (isAdmin && resolvedSearchParams.user_id) ? resolvedSearchParams.user_id : user.id
 
@@ -60,11 +60,12 @@ export default async function NewOrderPage({
     .single()
 
   // 最大注文可能日数をチェック
-  if (systemSettings?.max_order_days_ahead) {
+  const systemSettingsTyped = systemSettings as { max_order_days_ahead?: number } | null
+  if (systemSettingsTyped?.max_order_days_ahead) {
     const diffTime = orderDateObj.getTime() - today.getTime()
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
     
-    if (diffDays > systemSettings.max_order_days_ahead) {
+    if (diffDays > systemSettingsTyped.max_order_days_ahead) {
       redirect('/calendar')
     }
   }
@@ -76,15 +77,16 @@ export default async function NewOrderPage({
     .eq('target_date', orderDate)
     .single()
 
-  if (!orderDay || !orderDay.is_available) {
+  const orderDayTyped = orderDay as { is_available: boolean; deadline_time?: string | null } | null
+  if (!orderDayTyped || !orderDayTyped.is_available) {
     redirect('/calendar')
   }
 
   // 今日の場合、締切時刻をチェック
   const isToday = orderDateObj.getTime() === today.getTime()
-  if (isToday && orderDay.deadline_time) {
+  if (isToday && orderDayTyped.deadline_time) {
     const now = new Date()
-    const [hours, minutes] = orderDay.deadline_time.split(':').map(Number)
+    const [hours, minutes] = orderDayTyped.deadline_time.split(':').map(Number)
     const deadline = new Date(today)
     deadline.setHours(hours, minutes, 0, 0)
 
@@ -105,7 +107,7 @@ export default async function NewOrderPage({
   }
 
   // 業者が存在する場合のみメニューを取得
-  const vendorIds = vendors?.map(v => v.id) || []
+  const vendorIds = (vendors as Array<{ id: number | string }> | null)?.map(v => v.id) || []
   let menuItems = null
   let menuItemsError = null
 
@@ -130,9 +132,11 @@ export default async function NewOrderPage({
   }
 
   // 業者別にメニューをグループ化（vendor_idを使用）
-  const menusByVendor = new Map<number, typeof menuItems>()
-  menuItems?.forEach((menu) => {
-    const vendorId = menu.vendor_id
+  type MenuItem = { vendor_id: number | string; [key: string]: any }
+  const menusByVendor = new Map() as Map<number, MenuItem[]>
+  (menuItems as MenuItem[] | null)?.forEach((menu) => {
+    const vendorId = typeof menu.vendor_id === 'string' ? parseInt(menu.vendor_id, 10) : menu.vendor_id
+    if (isNaN(vendorId)) return
     if (!menusByVendor.has(vendorId)) {
       menusByVendor.set(vendorId, [])
     }
@@ -146,9 +150,9 @@ export default async function NewOrderPage({
         <h1 className="text-2xl font-bold text-gray-800">📝 新規注文</h1>
         <p className="text-gray-500 mt-1">
           {orderDateObj.getFullYear()}年{orderDateObj.getMonth() + 1}月{orderDateObj.getDate()}日
-          {isToday && orderDay.deadline_time && (
+          {isToday && orderDayTyped?.deadline_time && (
             <span className="ml-2 text-sm text-amber-600">
-              （締切: {orderDay.deadline_time}）
+              （締切: {orderDayTyped.deadline_time}）
             </span>
           )}
         </p>
@@ -165,8 +169,8 @@ export default async function NewOrderPage({
       <OrderForm
         orderDate={orderDate}
         vendors={vendors || []}
-        menusByVendor={menusByVendor}
-        deadlineTime={orderDay.deadline_time}
+        menusByVendor={menusByVendor as any}
+        deadlineTime={orderDayTyped?.deadline_time || null}
         targetUserId={isAdmin && targetUserId !== user.id ? targetUserId : undefined}
       />
     </div>

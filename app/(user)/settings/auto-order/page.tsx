@@ -21,7 +21,7 @@ export default async function AutoOrderSettingsPage() {
     .order('name', { ascending: true })
 
   // 業者が存在する場合のみメニューを取得
-  const vendorIds = vendors?.map(v => v.id) || []
+  const vendorIds = (vendors as Array<{ id: number | string }> | null)?.map(v => v.id) || []
   let menuItems = null
 
   if (vendorIds.length > 0) {
@@ -38,9 +38,11 @@ export default async function AutoOrderSettingsPage() {
   }
 
   // 業者別にメニューをグループ化
-  const menusByVendor = new Map<number, typeof menuItems>()
-  menuItems?.forEach((menu) => {
-    const vendorId = menu.vendor_id
+  type MenuItem = { vendor_id: number | string; [key: string]: any }
+  const menusByVendor = new Map() as Map<number, MenuItem[]>
+  (menuItems as MenuItem[] | null)?.forEach((menu) => {
+    const vendorId = typeof menu.vendor_id === 'string' ? parseInt(menu.vendor_id, 10) : menu.vendor_id
+    if (isNaN(vendorId)) return
     if (!menusByVendor.has(vendorId)) {
       menusByVendor.set(vendorId, [])
     }
@@ -57,7 +59,7 @@ export default async function AutoOrderSettingsPage() {
   return (
     <AutoOrderSettingsClient
       vendors={vendors || []}
-      menusByVendor={menusByVendor}
+      menusByVendor={menusByVendor as any}
       initialTemplates={templates || []}
     />
   )

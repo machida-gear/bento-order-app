@@ -36,14 +36,15 @@ export async function POST(
       )
     }
 
-    if (profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json(
         { error: '管理者権限が必要です' },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       return NextResponse.json(
         { error: 'アカウントが無効化されています' },
         { status: 403 }
@@ -65,7 +66,8 @@ export async function POST(
     }
 
     // 既に承認済みの場合はエラー
-    if (targetUser.is_active) {
+    const targetUserTyped = targetUser as { is_active?: boolean; employee_code?: string; [key: string]: any } | null
+    if (targetUserTyped?.is_active) {
       return NextResponse.json(
         { error: 'このユーザーは既に承認済みです' },
         { status: 400 }
@@ -76,7 +78,7 @@ export async function POST(
     const { data: existing } = await supabaseAdmin
       .from('profiles')
       .select('id')
-      .eq('employee_code', targetUser.employee_code)
+      .eq('employee_code', targetUserTyped?.employee_code || '')
       .neq('id', id)
       .maybeSingle()
 
@@ -88,8 +90,8 @@ export async function POST(
     }
 
     // ユーザーを承認（is_active=trueに設定）
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
+    const { data, error } = await (supabaseAdmin
+      .from('profiles') as any)
       .update({ is_active: true })
       .eq('id', id)
       .select()
@@ -108,16 +110,16 @@ export async function POST(
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'user.approve',
         target_table: 'profiles',
         target_id: id,
         details: {
           user_id: id,
-          employee_code: targetUser.employee_code,
-          full_name: targetUser.full_name,
-          email: targetUser.email,
+          employee_code: targetUserTyped?.employee_code,
+          full_name: targetUserTyped?.full_name,
+          email: targetUserTyped?.email,
         },
         ip_address: ipAddress,
       })

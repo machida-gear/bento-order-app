@@ -36,14 +36,15 @@ export async function POST(
       )
     }
 
-    if (profile.role !== 'admin') {
+    const profileTyped = profile as { role?: string; is_active?: boolean; [key: string]: any } | null
+    if (!profileTyped || profileTyped.role !== 'admin') {
       return NextResponse.json(
         { error: '管理者権限が必要です' },
         { status: 403 }
       )
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       return NextResponse.json(
         { error: 'アカウントが無効化されています' },
         { status: 403 }
@@ -65,7 +66,8 @@ export async function POST(
     }
 
     // 既に承認済み（is_active=true）の場合はエラー
-    if (targetUser.is_active) {
+    const targetUserTyped = targetUser as { is_active?: boolean; employee_code?: string; [key: string]: any } | null
+    if (targetUserTyped?.is_active) {
       return NextResponse.json(
         { error: '承認済みのユーザーは削除できません。無効化機能を使用してください。' },
         { status: 400 }
@@ -73,21 +75,22 @@ export async function POST(
     }
 
     // 社員コードをemployee_codesテーブルで解放（もし登録されていれば）
-    if (targetUser.employee_code) {
+    if (targetUserTyped?.employee_code) {
       const { data: employeeCodeMaster } = await supabaseAdmin
         .from('employee_codes')
         .select('id')
-        .eq('employee_code', targetUser.employee_code)
+        .eq('employee_code', targetUserTyped.employee_code)
         .maybeSingle()
 
-      if (employeeCodeMaster) {
-        await supabaseAdmin
-          .from('employee_codes')
+      const employeeCodeMasterTyped = employeeCodeMaster as { id: number; [key: string]: any } | null
+      if (employeeCodeMasterTyped) {
+        await (supabaseAdmin
+          .from('employee_codes') as any)
           .update({
             is_registered: false,
             registered_user_id: null,
           })
-          .eq('id', employeeCodeMaster.id)
+          .eq('id', employeeCodeMasterTyped.id)
       }
     }
 
@@ -158,16 +161,16 @@ export async function POST(
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'user.reject',
         target_table: 'profiles',
         target_id: id,
         details: {
           user_id: id,
-          employee_code: targetUser.employee_code,
-          full_name: targetUser.full_name,
-          email: targetUser.email,
+          employee_code: targetUserTyped?.employee_code,
+          full_name: targetUserTyped?.full_name,
+          email: targetUserTyped?.email,
           reason: '承認待ちユーザーの削除（拒否）',
           deleted_orders_count: orderCount,
         },

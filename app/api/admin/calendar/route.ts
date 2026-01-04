@@ -49,19 +49,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'プロフィールが見つかりません' }, { status: 403 })
     }
 
-    console.log('Profile found:', { userId: user.id, role: profile.role, is_active: profile.is_active, name: profile.full_name })
+    const profileTyped = profile as { role?: string; is_active?: boolean; full_name?: string; [key: string]: any }
+    console.log('Profile found:', { userId: user.id, role: profileTyped.role, is_active: profileTyped.is_active, name: profileTyped.full_name })
 
-    if (profile.role !== 'admin') {
-      console.error('User is not admin:', { userId: user.id, role: profile.role })
+    if (profileTyped.role !== 'admin') {
+      console.error('User is not admin:', { userId: user.id, role: profileTyped.role })
       return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
     }
 
-    if (!profile.is_active) {
+    if (!profileTyped.is_active) {
       console.error('User account is inactive:', { userId: user.id })
       return NextResponse.json({ error: 'アカウントが無効化されています' }, { status: 403 })
     }
 
-    console.log('Admin check passed:', { userId: user.id, role: profile.role, is_active: profile.is_active })
+    console.log('Admin check passed:', { userId: user.id, role: profileTyped.role, is_active: profileTyped.is_active })
 
     const body = await request.json()
     const { target_date, is_available, deadline_time, note } = body
@@ -103,8 +104,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // upsert（既に存在する場合は更新、存在しない場合は作成）
-    const { data, error } = await supabase
-      .from('order_calendar')
+    const { data, error } = await (supabase
+      .from('order_calendar') as any)
       .upsert({
         target_date,
         is_available: is_available ?? true,
@@ -137,7 +138,7 @@ export async function PUT(request: NextRequest) {
       const headersList = await headers()
       const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
       
-      await supabaseAdmin.from('audit_logs').insert({
+      await (supabaseAdmin.from('audit_logs') as any).insert({
         actor_id: user.id,
         action: 'calendar.update',
         target_table: 'order_calendar',
