@@ -309,7 +309,7 @@ function CalendarCell({
                   数量: {quantity}
                 </div>
                 <div className="text-[10px] sm:text-[10px] md:text-[10px] text-blue-500 mt-0.5">
-                  （クリックで変更）
+                  （変更可）
                 </div>
               </Link>
             ) : (
