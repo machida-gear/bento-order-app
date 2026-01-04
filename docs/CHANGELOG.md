@@ -2780,6 +2780,124 @@
 
 ---
 
+## 2026-01-02（テスト環境のセットアップとエラーハンドリングの統一）
+
+### テスト環境のセットアップ
+
+#### 実装内容
+
+- **Jest + React Testing Libraryのセットアップ**
+  - JestとReact Testing Libraryをインストール
+  - `jest.config.mjs`と`jest.setup.mjs`を作成
+  - `package.json`にテストスクリプトを追加（`test`, `test:watch`, `test:coverage`）
+
+#### 実装ファイル
+
+- `jest.config.mjs`: Jest設定ファイル
+- `jest.setup.mjs`: Jestセットアップファイル（環境変数のモック、Next.jsのモック）
+- `package.json`: テストスクリプトの追加
+
+### エラーハンドリングの統一
+
+#### 実装内容
+
+1. **エラーハンドリング用ユーティリティ関数の作成**
+   - `lib/utils/errors.ts`: エラーハンドリング用ユーティリティ関数
+     - `ApiError`クラス: カスタムエラークラス
+     - 各種エラーレスポンス生成関数（`unauthorizedResponse`, `forbiddenResponse`, `notFoundResponse`, `validationErrorResponse`, `internalErrorResponse`）
+     - `createErrorResponse`: エラーレスポンス生成ヘルパー関数
+
+2. **API Route用ヘルパー関数の作成**
+   - `lib/utils/api-helpers.ts`: API Route用ヘルパー関数
+     - `getAuthenticatedUser`: 認証済みユーザー取得
+     - `checkAdminPermission`: 管理者権限チェック
+     - `requireAdmin`: 管理者権限必須チェック
+     - `parseRequestBody`: リクエストボディのパース
+     - `checkUserActive`: ユーザーのアクティブ状態チェック
+     - `validateDateNotPast`: 日付バリデーション（過去の日付チェック）
+     - `validateQuantity`: 数量バリデーション
+
+#### 実装ファイル
+
+- `lib/utils/errors.ts`: エラーハンドリングユーティリティ関数（新規作成）
+- `lib/utils/api-helpers.ts`: API Route用ヘルパー関数（新規作成）
+
+### 型定義の整理
+
+#### 実装内容
+
+- `lib/utils/types.ts`: 共通型定義
+  - `ApiResponse`: APIレスポンスの基本型
+  - `PaginationParams`, `PaginationResponse`: ページネーション型
+  - `DateRange`: 日付範囲型
+  - `SortOption`: ソートオプション型
+  - `FilterOption`: フィルターオプション型
+
+#### 実装ファイル
+
+- `lib/utils/types.ts`: 共通型定義（新規作成）
+
+### テストの追加
+
+#### 実装内容
+
+- `lib/utils/api-helpers.test.ts`: バリデーション関数のテスト
+  - `validateDateNotPast`のテスト（未来の日付、今日の日付、過去の日付）
+  - `validateQuantity`のテスト（正の整数、0、負の数、小数）
+  - テスト結果: 9件すべて通過
+
+#### 実装ファイル
+
+- `lib/utils/api-helpers.test.ts`: バリデーション関数のテスト（新規作成）
+
+### ドキュメントの追加
+
+#### 実装内容
+
+- `docs/TESTING.md`: テストガイド
+  - テスト環境の説明
+  - テストの実行方法
+  - テストの種類（ユニットテスト、コンポーネントテスト、API Routeテスト）
+  - テストカバレッジの目標
+  - テストファイルの配置
+  - ベストプラクティス
+  - 今後の課題
+
+- `README_TESTING.md`: テスト実行ガイド（ルートディレクトリ）
+  - クイックスタート
+  - テストの種類
+  - 詳細ドキュメントへのリンク
+
+#### 実装ファイル
+
+- `docs/TESTING.md`: テストガイド（新規作成）
+- `README_TESTING.md`: テスト実行ガイド（新規作成）
+
+### .gitignoreの更新
+
+- `.gitignore`に`.cursor/`ディレクトリを追加（デバッグログを除外）
+
+#### 修正ファイル
+
+- `.gitignore`: `.cursor/`ディレクトリを追加
+
+### 確認事項
+
+- ✅ JestとReact Testing Libraryが正常に動作する
+- ✅ バリデーション関数のテストが9件すべて通過
+- ✅ エラーハンドリングユーティリティ関数が作成された
+- ✅ 型定義が整理された
+- ✅ テストドキュメントが追加された
+
+### 今後の課題
+
+- API Routeの統合テストの実装（モックを使用）
+- コンポーネントテストの追加
+- E2Eテストのセットアップ（PlaywrightまたはCypress）
+- エラーハンドリングユーティリティを既存API Routeに適用
+
+---
+
 ## 変更履歴の記録ルール
 
 - 日付は `YYYY-MM-DD` 形式で記載
