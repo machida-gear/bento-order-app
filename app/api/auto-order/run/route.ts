@@ -34,6 +34,30 @@ export async function POST(request: NextRequest) {
     today.setHours(0, 0, 0, 0)
     const todayStr = today.toISOString().split('T')[0]
 
+    // 退職済みユーザーの自動無効化処理（毎日実行）
+    try {
+      const { data: expiredUsers, error: fetchError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, employee_code, full_name, left_date')
+        .eq('is_active', true)
+        .not('left_date', 'is', null)
+        .lt('left_date', today.toISOString().split('T')[0])
+
+      if (!fetchError && expiredUsers && expiredUsers.length > 0) {
+        const expiredUsersTyped = expiredUsers as Array<{ id: string; [key: string]: any }>
+        const userIds = expiredUsersTyped.map(u => u.id)
+        await (supabaseAdmin
+          .from('profiles') as any)
+          .update({ is_active: false })
+          .in('id', userIds)
+        
+        console.log(`✅ ${expiredUsersTyped.length}人の退職済みユーザーを無効化しました`)
+      }
+    } catch (deactivateError) {
+      // 退職済みユーザー無効化のエラーはログに記録するが、自動注文処理は続行
+      console.error('退職済みユーザーの無効化処理中にエラーが発生しました:', deactivateError)
+    }
+
     // 翌営業日を取得（is_available = true の最初の日）
     let targetDate: string | null = null
     let targetDateObj: Date | null = null
