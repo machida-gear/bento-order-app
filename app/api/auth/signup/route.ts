@@ -108,12 +108,15 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
+    // 本番環境のURLを環境変数から取得、なければリクエストのオリジンを fallback として使用
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
+
     // 1. ユーザー登録
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${request.nextUrl.origin}/calendar`,
+        emailRedirectTo: `${siteUrl}/calendar`,
       },
     })
 
