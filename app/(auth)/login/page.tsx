@@ -188,14 +188,27 @@ export default function LoginPage() {
         return;
       }
 
-      // 本番環境のURLを環境変数から取得、なければ現在のオリジンを fallback として使用
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      // 本番環境のURLを環境変数から取得
+      // 本番環境では必ずNEXT_PUBLIC_SITE_URLを設定すること
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      
+      if (!siteUrl) {
+        // 開発環境の場合のみ警告を表示
+        if (window.location.origin.includes('localhost')) {
+          console.warn(
+            'NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。'
+          );
+        }
+      }
+
+      const redirectUrl = siteUrl 
+        ? `${siteUrl}/login?reset=true`
+        : `${window.location.origin}/login?reset=true`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         {
-          redirectTo: `${siteUrl}/login?reset=true`,
+          redirectTo: redirectUrl,
         }
       );
 
@@ -455,7 +468,7 @@ export default function LoginPage() {
 
         {/* フッター */}
         <p className="text-center text-gray-400 text-sm mt-6">
-          © 2024 お弁当注文システム
+          © 2026 お弁当注文システム
         </p>
       </div>
     </div>
