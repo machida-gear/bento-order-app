@@ -43,7 +43,7 @@ export default async function CalendarPage({
     is_active: boolean;
   } | null = null;
 
-  if (isAdminMode) {
+  if (isAdminMode && params.user_id) {
     // 管理者モードの場合、指定されたユーザーIDが存在するか確認（Service Role Keyを使用）
     const { data: profileData } = await supabaseAdmin
       .from("profiles")

@@ -12,9 +12,7 @@ import DeleteOrderButton from './delete-order-button'
 export default async function TodayOrdersPage({
   searchParams,
 }: {
-  searchParams:
-    | Promise<{ date?: string }>
-    | { date?: string }
+  searchParams: Promise<{ date?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -23,9 +21,8 @@ export default async function TodayOrdersPage({
     return null
   }
 
-  // Next.js 16ではsearchParamsがPromiseの場合があるため、awaitで解決
-  const params =
-    searchParams instanceof Promise ? await searchParams : searchParams
+  // Next.js 16ではsearchParamsがPromiseであるため、awaitで解決
+  const params = await searchParams
 
   // 管理者権限チェック
   const { data: currentProfile } = await supabaseAdmin

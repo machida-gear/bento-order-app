@@ -157,11 +157,13 @@ export async function PATCH(
     }
 
     // 古いユーザー情報を取得（監査ログ用）
-    const { data: oldUser } = await supabaseAdmin
-      .from("profiles")
-      .select("id, employee_code, full_name")
-      .eq("id", orderTyped.user_id)
-      .single();
+    const { data: oldUser } = orderTyped.user_id
+      ? await supabaseAdmin
+          .from("profiles")
+          .select("id, employee_code, full_name")
+          .eq("id", orderTyped.user_id)
+          .single()
+      : { data: null };
 
     const oldUserTyped = oldUser as {
       employee_code?: string;
