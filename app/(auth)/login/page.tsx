@@ -96,12 +96,12 @@ export default function LoginPage() {
       }
 
       // ログイン成功 → カレンダーページへ
+      // 画面が切り替わるまでローディング状態を維持するため、setLoading(false)は呼ばない
       router.push("/calendar");
       router.refresh();
+      // 成功時はsetLoading(false)を呼ばず、画面遷移まで「ログイン中...」を維持
     } catch {
       setError("ログインに失敗しました");
-      setLoading(false);
-    } finally {
       setLoading(false);
     }
   };
