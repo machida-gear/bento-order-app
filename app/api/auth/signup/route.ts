@@ -5,6 +5,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { translateAuthError } from '@/lib/utils/errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,7 +122,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 })
+      const translatedError = translateAuthError(authError.message)
+      return NextResponse.json({ error: translatedError }, { status: 400 })
     }
 
     if (!authData.user) {

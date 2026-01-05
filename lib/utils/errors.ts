@@ -137,3 +137,61 @@ export function internalErrorResponse(
     { status: 500 }
   )
 }
+
+/**
+ * Supabase Authのエラーメッセージを日本語に変換する
+ */
+export function translateAuthError(message: string): string {
+  const errorMessages: { [key: string]: string } = {
+    'Invalid login credentials':
+      'メールアドレスまたはパスワードが正しくありません',
+    'Email not confirmed': 'メールアドレスが確認されていません',
+    'User not found': 'ユーザーが見つかりません',
+    'Invalid email': 'メールアドレスの形式が正しくありません',
+    'Password is too weak': 'パスワードが弱すぎます',
+    'Email rate limit exceeded':
+      'メール送信の制限を超えました。しばらく時間をおいてから再度お試しください',
+    'Signups are disabled': '新規登録が無効になっています',
+  }
+
+  // 完全一致するエラーメッセージがあれば日本語に変換
+  if (errorMessages[message]) {
+    return errorMessages[message]
+  }
+
+  // エラーメッセージに特定の文字列が含まれている場合
+  const lowerMessage = message.toLowerCase()
+
+  if (lowerMessage.includes('invalid login credentials')) {
+    return 'メールアドレスまたはパスワードが正しくありません'
+  }
+  if (lowerMessage.includes('email not confirmed')) {
+    return 'メールアドレスが確認されていません'
+  }
+  if (lowerMessage.includes('user not found')) {
+    return 'ユーザーが見つかりません'
+  }
+  // メールアドレスの無効エラー（"Email address "xxx" is invalid" の形式）
+  if (lowerMessage.includes('is invalid') && lowerMessage.includes('email')) {
+    return 'メールアドレスの形式が正しくありません。メールアドレスを確認してください'
+  }
+  // メールアドレスの無効エラー（"Invalid email" の形式）
+  if (lowerMessage.includes('invalid email')) {
+    return 'メールアドレスの形式が正しくありません'
+  }
+  // パスワード関連のエラー
+  if (lowerMessage.includes('password') && lowerMessage.includes('weak')) {
+    return 'パスワードが弱すぎます'
+  }
+  // メール送信制限エラー
+  if (lowerMessage.includes('rate limit') && lowerMessage.includes('email')) {
+    return 'メール送信の制限を超えました。しばらく時間をおいてから再度お試しください'
+  }
+  // 新規登録無効エラー
+  if (lowerMessage.includes('signups are disabled') || lowerMessage.includes('signup disabled')) {
+    return '新規登録が無効になっています'
+  }
+
+  // それ以外の場合は元のメッセージを返す
+  return message
+}

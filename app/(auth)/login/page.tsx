@@ -158,6 +158,10 @@ export default function LoginPage() {
           data.message + " メールのリンクをクリックして登録を完了してください。"
         );
       }
+
+      // セッション状態を更新するためにページをリフレッシュ
+      router.refresh();
+
       // フォームをクリア
       setEmail("");
       setPassword("");

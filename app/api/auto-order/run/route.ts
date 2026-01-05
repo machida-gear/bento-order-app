@@ -28,11 +28,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 現在の日時を取得（JST）
+    // Intl.DateTimeFormatを使用してJST時刻の日付文字列を取得
     const now = new Date()
-    const jstNow = new Date(now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }))
-    const today = new Date(jstNow)
-    today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().split('T')[0]
+    const jstDateFormatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    const parts = jstDateFormatter.formatToParts(now)
+    const year = parts.find(p => p.type === 'year')?.value || ''
+    const month = parts.find(p => p.type === 'month')?.value || ''
+    const day = parts.find(p => p.type === 'day')?.value || ''
+    const todayStr = `${year}-${month}-${day}`
+    const today = new Date(`${todayStr}T00:00:00+09:00`) // JST基準のDateオブジェクトを作成
 
     // 退職済みユーザーの自動無効化処理（毎日実行）
     try {
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
         .select('id, employee_code, full_name, left_date')
         .eq('is_active', true)
         .not('left_date', 'is', null)
-        .lt('left_date', today.toISOString().split('T')[0])
+        .lt('left_date', todayStr)
 
       if (!fetchError && expiredUsers && expiredUsers.length > 0) {
         const expiredUsersTyped = expiredUsers as Array<{ id: string; [key: string]: any }>
@@ -66,13 +75,18 @@ export async function POST(request: NextRequest) {
     for (let i = 1; i <= 30; i++) {
       const checkDate = new Date(today)
       checkDate.setDate(checkDate.getDate() + i)
-      const checkDateStr = checkDate.toISOString().split('T')[0]
+      // JST基準の日付文字列を取得
+      const checkDateParts = jstDateFormatter.formatToParts(checkDate)
+      const checkYear = checkDateParts.find(p => p.type === 'year')?.value || ''
+      const checkMonth = checkDateParts.find(p => p.type === 'month')?.value || ''
+      const checkDay = checkDateParts.find(p => p.type === 'day')?.value || ''
+      const checkDateStr = `${checkYear}-${checkMonth}-${checkDay}`
 
       const { data: orderDay } = await supabaseAdmin
         .from('order_calendar')
         .select('*')
         .eq('target_date', checkDateStr)
-        .single()
+        .maybeSingle()
 
       const orderDayTyped = orderDay as { is_available?: boolean; [key: string]: any } | null
       if (orderDayTyped && orderDayTyped.is_available) {
@@ -94,11 +108,11 @@ export async function POST(request: NextRequest) {
       .from('auto_order_runs') as any)
       .insert({
         run_date: todayStr,
-        executed_at: jstNow.toISOString(),
+        executed_at: now.toISOString(),
         status: 'running',
         log_details: {
           target_date: targetDate,
-          executed_at: jstNow.toISOString(),
+          executed_at: now.toISOString(),
         },
       })
       .select()

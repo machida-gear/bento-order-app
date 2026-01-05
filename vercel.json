@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/auto-order/run",
-      "schedule": "0 10 * * *"
+      "schedule": "0 1 * * *"
     }
   ]
 }
