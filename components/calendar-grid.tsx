@@ -25,6 +25,7 @@ interface CalendarGridProps {
   ordersMap: Map<string, Order>;
   maxOrderDaysAhead: number;
   targetUserId?: string; // 管理者が代理操作する場合の対象ユーザーID
+  isAdminMode?: boolean; // 管理者モード（user_idパラメータが指定されている場合）
 }
 
 /**
@@ -37,6 +38,7 @@ export default function CalendarGrid({
   ordersMap,
   maxOrderDaysAhead,
   targetUserId,
+  isAdminMode = false,
 }: CalendarGridProps) {
   // 今日の日付と時刻（ローカルタイムゾーン）
   const today = new Date();
@@ -84,6 +86,11 @@ export default function CalendarGrid({
 
   // その日が注文可能かどうか（締切時刻と日数制限を考慮）
   const canOrder = (date: Date, orderDay?: OrderDay | null): boolean => {
+    // 管理者モードの場合は注文可能日チェックをスキップ（過去の日付も選択可能）
+    if (isAdminMode) {
+      return true;
+    }
+
     if (!orderDay?.is_available) return false;
 
     // 過去の日付は注文不可
@@ -175,9 +182,10 @@ export default function CalendarGrid({
           const daysAhead = getDaysAhead(date);
           const exceedsMaxDays = daysAhead > maxOrderDaysAhead;
 
-          // 過去の日付、または注文不可の日、または最大日数を超えている日はグレーにする
+          // 過去の日付、または注文不可の日、または最大日数を超えている日はグレーにする（管理者モードの場合は過去の日付はグレーにしない）
           const shouldBeGray =
-            !isAvailable || isPastDate || !canOrderToday || exceedsMaxDays;
+            !isAdminMode && (!isAvailable || isPastDate || !canOrderToday || exceedsMaxDays) ||
+            (isAdminMode && !isAvailable);
 
           return (
             <div
@@ -207,6 +215,7 @@ export default function CalendarGrid({
                 canOrder={canOrderToday}
                 exceedsMaxDays={exceedsMaxDays}
                 targetUserId={targetUserId}
+                isAdminMode={isAdminMode}
               />
             </div>
           );
@@ -225,6 +234,7 @@ interface CalendarCellProps {
   canOrder: boolean;
   exceedsMaxDays: boolean;
   targetUserId?: string;
+  isAdminMode?: boolean;
 }
 
 function CalendarCell({
@@ -236,12 +246,18 @@ function CalendarCell({
   canOrder,
   exceedsMaxDays,
   targetUserId,
+  isAdminMode = false,
 }: CalendarCellProps) {
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
   // 注文済みの場合、締切時刻前かどうかをチェック
   const canEditOrder = (): boolean => {
     if (!order || !orderDay) return false;
+
+    // 管理者モードの場合は過去の日付も編集可能
+    if (isAdminMode) {
+      return true;
+    }
 
     // 過去の日付は変更不可
     const orderDateObj = new Date(order.order_date + "T00:00:00");

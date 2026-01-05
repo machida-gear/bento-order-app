@@ -32,7 +32,10 @@ export default async function CalendarPage({
 
   const isAdmin = (currentProfile as { role?: string } | null)?.role === "admin";
 
-  // 対象ユーザーIDを決定（管理者がuser_idパラメータを指定した場合はそれを使用、それ以外は現在のユーザーID）
+  // 管理者モードの判定: user_idパラメータが指定されている場合（管理者権限がある場合のみ許可）
+  const isAdminMode = isAdmin && params.user_id !== undefined;
+
+  // 対象ユーザーIDを決定（管理者モードの場合はuser_idパラメータを使用、それ以外は現在のユーザーID）
   let targetUserId = user.id;
   let targetProfile: {
     id: string;
@@ -40,8 +43,8 @@ export default async function CalendarPage({
     is_active: boolean;
   } | null = null;
 
-  if (isAdmin && params.user_id) {
-    // 管理者が指定したユーザーIDが存在するか確認（Service Role Keyを使用）
+  if (isAdminMode) {
+    // 管理者モードの場合、指定されたユーザーIDが存在するか確認（Service Role Keyを使用）
     const { data: profileData } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, is_active")
@@ -51,6 +54,9 @@ export default async function CalendarPage({
     if (profileData) {
       targetUserId = params.user_id;
       targetProfile = profileData as { id: string; full_name: string; is_active: boolean };
+    } else {
+      // 指定されたユーザーIDが存在しない場合は、現在のユーザーIDを使用
+      targetUserId = user.id;
     }
   }
 
@@ -288,7 +294,7 @@ export default async function CalendarPage({
       <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
         <a
           href={`/calendar?year=${prevYear}&month=${prevMonthDisplay}${
-            isAdmin && params.user_id ? `&user_id=${params.user_id}` : ""
+            isAdminMode ? `&user_id=${targetUserId}` : ""
           }`}
           className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg hover:bg-gray-100 transition-colors"
         >
@@ -307,10 +313,10 @@ export default async function CalendarPage({
         <div className="text-base sm:text-lg font-semibold text-gray-800">
           {currentYear}年{currentMonthDisplay}月
         </div>
-        <a
-          href={`/calendar?year=${nextYear}&month=${nextMonthDisplay}${
-            isAdmin && params.user_id ? `&user_id=${params.user_id}` : ""
-          }`}
+          <a
+            href={`/calendar?year=${nextYear}&month=${nextMonthDisplay}${
+              isAdminMode ? `&user_id=${targetUserId}` : ""
+            }`}
           className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <svg
@@ -338,23 +344,22 @@ export default async function CalendarPage({
       )}
 
       {/* 管理者モードの表示 */}
-      {isAdmin &&
-        params.user_id &&
-        targetUserId !== user.id &&
-        targetProfile && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-            <p className="font-medium">
-              管理者モード: {targetProfile.full_name || "ユーザー"}
-              さんのカレンダーを表示中
-            </p>
+      {isAdminMode && targetProfile && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          <p className="font-medium">
+            管理者モード: {targetProfile.full_name || "ユーザー"}
+            {targetUserId !== user.id ? "さんのカレンダーを表示中" : "（過去の日付にも注文可能）"}
+          </p>
+          {targetUserId !== user.id && (
             <a
               href={`/calendar?year=${currentYear}&month=${currentMonthDisplay}`}
               className="text-amber-600 hover:text-amber-700 underline mt-1 inline-block"
             >
               自分のカレンダーに戻る
             </a>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
       {/* カレンダーグリッド */}
       <CalendarGrid
@@ -363,7 +368,8 @@ export default async function CalendarPage({
         orderDaysMap={orderDaysMap}
         ordersMap={ordersMap}
         maxOrderDaysAhead={(systemSettings as { max_order_days_ahead?: number } | null)?.max_order_days_ahead || 30}
-        targetUserId={isAdmin && params.user_id ? targetUserId : undefined}
+        targetUserId={isAdminMode ? targetUserId : undefined}
+        isAdminMode={isAdminMode}
       />
     </div>
   );

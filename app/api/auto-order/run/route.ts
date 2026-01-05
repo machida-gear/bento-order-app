@@ -14,12 +14,16 @@ export async function POST(request: NextRequest) {
     // Vercel Cron Jobsは自動的に `x-vercel-cron` ヘッダーを付与します
     const isVercelCron = request.headers.get('x-vercel-cron') === '1'
     
+    console.log('=== Auto Order Run API Called ===')
+    console.log('isVercelCron:', isVercelCron)
+    
     // 開発環境や手動実行の場合は、Authorizationヘッダーで認証
     if (!isVercelCron) {
       const authHeader = request.headers.get('authorization')
       const expectedSecret = process.env.AUTO_ORDER_SECRET
       
       if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
+        console.log('Authentication failed: Authorization header does not match')
         return NextResponse.json(
           { error: '認証が必要です。Authorization: Bearer <AUTO_ORDER_SECRET> ヘッダーを設定してください。' },
           { status: 401 }
@@ -42,6 +46,8 @@ export async function POST(request: NextRequest) {
     const day = parts.find(p => p.type === 'day')?.value || ''
     const todayStr = `${year}-${month}-${day}`
     const today = new Date(`${todayStr}T00:00:00+09:00`) // JST基準のDateオブジェクトを作成
+
+    console.log('Today (JST):', todayStr)
 
     // 退職済みユーザーの自動無効化処理（毎日実行）
     try {
@@ -97,11 +103,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!targetDate || !targetDateObj) {
+      console.log('Next business day not found')
       return NextResponse.json(
         { error: '翌営業日が見つかりませんでした' },
         { status: 404 }
       )
     }
+
+    console.log('Target date (next business day):', targetDate)
 
     // 実行履歴を作成
     const { data: runRecord, error: runError } = await (supabaseAdmin
@@ -142,6 +151,8 @@ export async function POST(request: NextRequest) {
     }
 
     const usersTyped = users as Array<{ id: string; [key: string]: any }> | null
+
+    console.log('Active users count:', usersTyped?.length || 0)
 
     if (!usersTyped || usersTyped.length === 0) {
       // 実行履歴を更新
@@ -195,12 +206,13 @@ export async function POST(request: NextRequest) {
         const dayOfWeek = targetDateObj.getDay()
 
         // テンプレートを取得（毎日テンプレートまたは該当曜日のテンプレート）
+        // nullsFirstオプションはSupabaseのJavaScriptクライアントでサポートされていない可能性があるため削除
         const { data: templates, error: templatesError } = await supabaseAdmin
           .from('auto_order_templates')
           .select('*')
           .eq('user_id', user.id)
           .or(`day_of_week.is.null,day_of_week.eq.${dayOfWeek}`)
-          .order('day_of_week', { ascending: true, nullsFirst: false })
+          .order('day_of_week', { ascending: true })
 
         if (templatesError) {
           throw templatesError
@@ -377,6 +389,13 @@ export async function POST(request: NextRequest) {
     const skippedCount = results.filter(r => r.result === 'skipped').length
     const errorCount = results.filter(r => r.result === 'error').length
 
+    console.log('Auto order results:', {
+      created: createdCount,
+      skipped: skippedCount,
+      errors: errorCount,
+      total: results.length,
+    })
+
     await (supabaseAdmin
       .from('auto_order_runs') as any)
       .update({
@@ -392,6 +411,8 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', runId)
 
+    console.log('Auto order run completed successfully')
+
     return NextResponse.json({
       success: true,
       run_id: runId,
@@ -404,7 +425,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Auto order run error:', error)
+    console.error('=== Auto Order Run Error ===')
+    console.error('Error:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       { error: '自動注文の実行に失敗しました: ' + errorMessage },

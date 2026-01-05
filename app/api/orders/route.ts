@@ -37,11 +37,14 @@ export async function POST(request: NextRequest) {
 
     const { menu_id, order_date, quantity, user_id } = await request.json();
 
-    // 注文対象のユーザーIDを決定（管理者がuser_idを指定した場合はそれを使用、それ以外は現在のユーザーID）
-    const targetUserId = isAdmin && user_id ? user_id : user.id;
+    // 管理者モードの判定: user_idパラメータが指定されている場合（管理者権限がある場合のみ許可）
+    const isAdminMode = isAdmin && user_id !== undefined;
 
-    // 管理者が他のユーザーIDを指定した場合、そのユーザーが存在するかチェック
-    if (isAdmin && user_id && user_id !== user.id) {
+    // 注文対象のユーザーIDを決定（管理者モードの場合はuser_idを使用、それ以外は現在のユーザーID）
+    const targetUserId = isAdminMode ? user_id : user.id;
+
+    // 管理者モードの場合、指定されたユーザーIDが存在するかチェック
+    if (isAdminMode && user_id !== user.id) {
       const { data: targetProfile, error: targetProfileError } =
         await supabaseAdmin
           .from("profiles")
@@ -128,12 +131,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 過去の日付チェック
+    // 過去の日付チェック（管理者の場合はスキップ）
     const orderDateObj = new Date(order_date + "T00:00:00");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (orderDateObj < today) {
+    if (!isAdmin && orderDateObj < today) {
       return NextResponse.json(
         { error: "過去の日付には注文できません" },
         { status: 400 }
@@ -148,8 +151,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     const systemSettingsTyped = systemSettings as { max_order_days_ahead?: number | null; [key: string]: any } | null
-    // 最大注文可能日数をチェック
-    if (systemSettingsTyped?.max_order_days_ahead) {
+    // 最大注文可能日数をチェック（管理者の場合はスキップ）
+    if (!isAdmin && systemSettingsTyped?.max_order_days_ahead) {
       const diffTime = orderDateObj.getTime() - today.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
@@ -163,7 +166,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 注文可能日チェック
+    // 注文可能日チェック（管理者の場合はスキップ）
     const { data: orderDay, error: orderDayError } = await supabase
       .from("order_calendar")
       .select("*")
@@ -171,26 +174,28 @@ export async function POST(request: NextRequest) {
       .single();
 
     const orderDayTyped = orderDay as { is_available?: boolean; deadline_time?: string | null; [key: string]: any } | null
-    if (orderDayError || !orderDayTyped || !orderDayTyped.is_available) {
-      return NextResponse.json(
-        { error: "この日は注文できません" },
-        { status: 400 }
-      );
-    }
-
-    // 今日の場合、締切時刻をチェック
-    const isToday = orderDateObj.getTime() === today.getTime();
-    if (isToday && orderDayTyped.deadline_time) {
-      const now = new Date();
-      const [hours, minutes] = orderDayTyped.deadline_time.split(":").map(Number);
-      const deadline = new Date(today);
-      deadline.setHours(hours, minutes, 0, 0);
-
-      if (now >= deadline) {
+    if (!isAdmin) {
+      if (orderDayError || !orderDayTyped || !orderDayTyped.is_available) {
         return NextResponse.json(
-          { error: "締切時刻を過ぎています" },
+          { error: "この日は注文できません" },
           { status: 400 }
         );
+      }
+
+      // 今日の場合、締切時刻をチェック
+      const isToday = orderDateObj.getTime() === today.getTime();
+      if (isToday && orderDayTyped.deadline_time) {
+        const now = new Date();
+        const [hours, minutes] = orderDayTyped.deadline_time.split(":").map(Number);
+        const deadline = new Date(today);
+        deadline.setHours(hours, minutes, 0, 0);
+
+        if (now >= deadline) {
+          return NextResponse.json(
+            { error: "締切時刻を過ぎています" },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -382,14 +387,14 @@ export async function POST(request: NextRequest) {
         const orderDataTyped = orderData as { id: number; [key: string]: any }
         await (supabaseAdmin.from("audit_logs") as any).insert({
           actor_id: user.id, // 実際に操作したユーザー（管理者）
-          action: isAdmin && user_id ? "order.create.admin" : "order.create",
+          action: isAdminMode ? "order.create.admin" : "order.create",
           details: {
             order_id: orderDataTyped.id,
             menu_item_id: menu_id,
             order_date,
             quantity,
             target_user_id: targetUserId, // 注文対象のユーザーID
-            ...(isAdmin && user_id ? { created_by_admin: true } : {}),
+            ...(isAdminMode ? { created_by_admin: true } : {}),
           },
           target_table: "orders",
           target_id: orderDataTyped.id.toString(),

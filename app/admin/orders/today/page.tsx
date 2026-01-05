@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import DateCalendar from './date-calendar'
 import ChangeUserButton from './change-user-button'
+import DeleteOrderButton from './delete-order-button'
 
 /**
  * 注文一覧ページ（日付指定可能）
@@ -378,6 +379,12 @@ export default async function TodayOrdersPage({
                                         orderId={order.id}
                                         currentUserId={order.user_id}
                                         currentUserName={order.user_name}
+                                      />
+                                      <span className="text-gray-300">|</span>
+                                      <DeleteOrderButton
+                                        orderId={order.id}
+                                        orderDate={order.order_date}
+                                        userName={order.user_name}
                                       />
                                     </div>
                                   </td>

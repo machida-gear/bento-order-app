@@ -31,6 +31,9 @@ export default async function NewOrderPage({
   const resolvedSearchParams = await searchParams
   const orderDate = resolvedSearchParams.date
   const targetUserId = (isAdmin && resolvedSearchParams.user_id) ? resolvedSearchParams.user_id : user.id
+  
+  // 管理者モードの判定: user_idパラメータが指定されている場合（管理者権限がある場合のみ許可）
+  const isAdminMode = isAdmin && resolvedSearchParams.user_id !== undefined
 
   if (!orderDate) {
     redirect('/calendar')
@@ -47,8 +50,8 @@ export default async function NewOrderPage({
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // 過去の日付は注文不可
-  if (orderDateObj < today) {
+  // 過去の日付チェック（管理者モードの場合はスキップ）
+  if (!isAdminMode && orderDateObj < today) {
     redirect('/calendar')
   }
 
@@ -59,9 +62,9 @@ export default async function NewOrderPage({
     .eq('id', 1)
     .single()
 
-  // 最大注文可能日数をチェック
+  // 最大注文可能日数をチェック（管理者モードの場合はスキップ）
   const systemSettingsTyped = systemSettings as { max_order_days_ahead?: number } | null
-  if (systemSettingsTyped?.max_order_days_ahead) {
+  if (!isAdminMode && systemSettingsTyped?.max_order_days_ahead) {
     const diffTime = orderDateObj.getTime() - today.getTime()
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
     
@@ -70,7 +73,7 @@ export default async function NewOrderPage({
     }
   }
 
-  // 注文可能日をチェック
+  // 注文可能日をチェック（管理者モードの場合はスキップ）
   const { data: orderDay } = await supabase
     .from('order_calendar')
     .select('*')
@@ -78,13 +81,13 @@ export default async function NewOrderPage({
     .single()
 
   const orderDayTyped = orderDay as { is_available: boolean; deadline_time?: string | null } | null
-  if (!orderDayTyped || !orderDayTyped.is_available) {
+  if (!isAdminMode && (!orderDayTyped || !orderDayTyped.is_available)) {
     redirect('/calendar')
   }
 
-  // 今日の場合、締切時刻をチェック
+  // 今日の場合、締切時刻をチェック（管理者モードの場合はスキップ）
   const isToday = orderDateObj.getTime() === today.getTime()
-  if (isToday && orderDayTyped.deadline_time) {
+  if (!isAdminMode && isToday && orderDayTyped?.deadline_time) {
     const now = new Date()
     const [hours, minutes] = orderDayTyped.deadline_time.split(':').map(Number)
     const deadline = new Date(today)
@@ -159,9 +162,9 @@ export default async function NewOrderPage({
       </div>
 
       {/* 管理者モードの表示 */}
-      {isAdmin && targetUserId !== user.id && (
+      {isAdminMode && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm mb-4">
-          <p className="font-medium">管理者モード: 代理で注文を作成します</p>
+          <p className="font-medium">管理者モード: {targetUserId !== user.id ? '代理で注文を作成します' : '過去の日付にも注文可能です'}</p>
         </div>
       )}
 
@@ -171,7 +174,7 @@ export default async function NewOrderPage({
         vendors={vendors || []}
         menusByVendor={menusByVendor as any}
         deadlineTime={orderDayTyped?.deadline_time || null}
-        targetUserId={isAdmin && targetUserId !== user.id ? targetUserId : undefined}
+        targetUserId={isAdminMode ? targetUserId : undefined}
       />
     </div>
   )

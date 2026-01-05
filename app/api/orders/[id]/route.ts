@@ -396,40 +396,44 @@ export async function PATCH(
       .single();
 
     const orderDayTypedDelete = orderDay as { deadline_time?: string | null; [key: string]: any } | null
-    // 締切時刻を過ぎた注文はキャンセル不可（仕様として）
-    // キャンセル処理中に締切時間を過ぎた場合もチェック
-    if (orderDayTypedDelete?.deadline_time) {
-      const orderDateObj = new Date(orderTypedDelete.order_date! + "T00:00:00");
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isToday = orderDateObj.getTime() === today.getTime();
+    
+    // 一般ユーザーの場合、締切時刻を過ぎた注文はキャンセル不可（管理者は可能）
+    if (!isAdmin) {
+      // 締切時刻を過ぎた注文はキャンセル不可（仕様として）
+      // キャンセル処理中に締切時間を過ぎた場合もチェック
+      if (orderDayTypedDelete?.deadline_time) {
+        const orderDateObj = new Date(orderTypedDelete.order_date! + "T00:00:00");
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isToday = orderDateObj.getTime() === today.getTime();
 
-      if (isToday || orderDateObj < today) {
-        const now = new Date();
-        const [hours, minutes] = orderDayTypedDelete.deadline_time.split(":").map(Number);
-        const deadline = new Date(orderDateObj);
-        deadline.setHours(hours, minutes, 0, 0);
+        if (isToday || orderDateObj < today) {
+          const now = new Date();
+          const [hours, minutes] = orderDayTypedDelete.deadline_time.split(":").map(Number);
+          const deadline = new Date(orderDateObj);
+          deadline.setHours(hours, minutes, 0, 0);
 
-        if (now >= deadline) {
+          if (now >= deadline) {
+            return NextResponse.json(
+              {
+                error: "締切時刻を過ぎているため、キャンセルできません",
+              },
+              { status: 400 }
+            );
+          }
+        }
+      } else {
+        // deadline_timeが設定されていない場合、過去の日付はキャンセル不可
+        const orderDateObj = new Date(orderTypedDelete.order_date! + "T00:00:00");
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (orderDateObj < today) {
           return NextResponse.json(
-            {
-              error: "最終の確定処理で時間を過ぎているためキャンセルできません",
-            },
+            { error: "過去の日付の注文はキャンセルできません" },
             { status: 400 }
           );
         }
-      }
-    } else {
-      // deadline_timeが設定されていない場合、過去の日付はキャンセル不可
-      const orderDateObj = new Date(orderTypedDelete.order_date! + "T00:00:00");
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (orderDateObj < today) {
-        return NextResponse.json(
-          { error: "過去の日付の注文はキャンセルできません" },
-          { status: 400 }
-        );
       }
     }
 
@@ -489,6 +493,126 @@ export async function PATCH(
     return NextResponse.json(
       {
         error: "注文キャンセル処理中にエラーが発生しました: " + errorMessage,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * 注文削除API（管理者のみ）
+ * DELETE /api/orders/[id]
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+
+    // 管理者権限チェック
+    const { data: currentProfile, error: currentProfileError } =
+      await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+    if (currentProfileError || !currentProfile) {
+      return NextResponse.json(
+        { error: "プロフィールの取得に失敗しました" },
+        { status: 500 }
+      );
+    }
+
+    const currentProfileTyped = currentProfile as { role?: string; [key: string]: any } | null
+    const isAdmin = currentProfileTyped?.role === "admin";
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "管理者権限が必要です" },
+        { status: 403 }
+      );
+    }
+
+    const resolvedParams = await Promise.resolve(params);
+    const orderId = parseInt(resolvedParams.id, 10);
+
+    if (isNaN(orderId)) {
+      return NextResponse.json({ error: "注文IDが無効です" }, { status: 400 });
+    }
+
+    // 注文の存在確認
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .single();
+
+    if (orderError || !order) {
+      return NextResponse.json(
+        { error: "注文が見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    const orderTyped = order as { order_date?: string; user_id?: string; menu_item_id?: number; quantity?: number; [key: string]: any }
+
+    // 注文を物理削除（Service Role Keyを使用してRLSをバイパス）
+    const { error: deleteError } = await (supabaseAdmin
+      .from("orders") as any)
+      .delete()
+      .eq("id", orderId);
+
+    if (deleteError) {
+      return NextResponse.json(
+        {
+          error: "注文の削除に失敗しました",
+          details:
+            deleteError.message || deleteError.details || "Unknown error",
+          code: deleteError.code,
+        },
+        { status: 500 }
+      );
+    }
+
+    // 監査ログ記録
+    try {
+      await (supabaseAdmin.from("audit_logs") as any).insert({
+        actor_id: user.id,
+        action: "order.delete.admin",
+        details: {
+          order_id: orderId,
+          order_date: orderTyped.order_date,
+          target_user_id: orderTyped.user_id,
+          menu_item_id: orderTyped.menu_item_id,
+          quantity: orderTyped.quantity,
+          deleted_by_admin: true,
+        },
+        target_table: "orders",
+        target_id: orderId.toString(),
+      });
+    } catch (auditLogError) {
+      // 監査ログの記録エラーは無視（削除は成功しているため）
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "注文を削除しました",
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json(
+      {
+        error: "注文削除処理中にエラーが発生しました: " + errorMessage,
       },
       { status: 500 }
     );

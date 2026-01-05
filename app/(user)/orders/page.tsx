@@ -57,18 +57,25 @@ export default async function OrdersPage() {
     orderDate: string,
     deadlineTime: string | null
   ): boolean => {
-    if (!deadlineTime) return false;
+    if (!deadlineTime) {
+      // deadline_timeが設定されていない場合、過去の日付は締切時間を過ぎているとみなす
+      const orderDateObj = new Date(orderDate + "T00:00:00");
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return orderDateObj < today;
+    }
 
     const orderDateObj = new Date(orderDate + "T00:00:00");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const isToday = orderDateObj.getTime() === today.getTime();
 
-    if (!isToday && orderDateObj < today) {
-      // 過去の日付は締切時間を過ぎている
+    // 過去の日付は締切時間を過ぎている
+    if (orderDateObj < today) {
       return true;
     }
 
+    // 今日の日付の場合、現在時刻と締切時刻を比較
     if (isToday) {
       const now = new Date();
       const [hours, minutes] = deadlineTime.split(":").map(Number);
@@ -78,6 +85,7 @@ export default async function OrdersPage() {
       return now >= deadline;
     }
 
+    // 未来の日付は締切時間を過ぎていない
     return false;
   };
 
