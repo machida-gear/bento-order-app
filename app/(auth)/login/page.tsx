@@ -5,6 +5,42 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 /**
+ * Supabaseのエラーメッセージを日本語に変換する関数
+ */
+function translateAuthError(message: string): string {
+  const errorMessages: { [key: string]: string } = {
+    "Invalid login credentials":
+      "メールアドレスまたはパスワードが正しくありません",
+    "Email not confirmed": "メールアドレスが確認されていません",
+    "User not found": "ユーザーが見つかりません",
+    "Invalid email": "メールアドレスの形式が正しくありません",
+    "Password is too weak": "パスワードが弱すぎます",
+    "Email rate limit exceeded":
+      "メール送信の制限を超えました。しばらく時間をおいてから再度お試しください",
+    "Signups are disabled": "新規登録が無効になっています",
+  };
+
+  // 完全一致するエラーメッセージがあれば日本語に変換
+  if (errorMessages[message]) {
+    return errorMessages[message];
+  }
+
+  // エラーメッセージに特定の文字列が含まれている場合
+  if (message.toLowerCase().includes("invalid login credentials")) {
+    return "メールアドレスまたはパスワードが正しくありません";
+  }
+  if (message.toLowerCase().includes("email not confirmed")) {
+    return "メールアドレスが確認されていません";
+  }
+  if (message.toLowerCase().includes("user not found")) {
+    return "ユーザーが見つかりません";
+  }
+
+  // それ以外の場合は元のメッセージを返す
+  return message;
+}
+
+/**
  * ログインページ
  * メールアドレス + パスワード認証
  */
@@ -35,7 +71,8 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setError(error.message);
+        setError(translateAuthError(error.message));
+        setLoading(false);
         return;
       }
 
@@ -53,6 +90,7 @@ export default function LoginPage() {
           setError(
             "アカウントは管理者の承認待ちです。承認が完了するまでお待ちください。"
           );
+          setLoading(false);
           return;
         }
       }
@@ -62,6 +100,7 @@ export default function LoginPage() {
       router.refresh();
     } catch {
       setError("ログインに失敗しました");
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -157,7 +196,7 @@ export default function LoginPage() {
       );
 
       if (resetError) {
-        setError(resetError.message);
+        setError(translateAuthError(resetError.message));
         return;
       }
 
