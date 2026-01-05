@@ -52,37 +52,61 @@ export default async function OrdersPage() {
     ((orderDays as Array<{ target_date: string; deadline_time: string | null }> | null)?.map((day) => [day.target_date, day]) || [])
   );
 
-  // 締切時間を過ぎたかどうかを判定する関数
+  // 締切時間を過ぎたかどうかを判定する関数（JSTで統一）
   const isAfterDeadline = (
     orderDate: string,
     deadlineTime: string | null
   ): boolean => {
-    if (!deadlineTime) {
-      // deadline_timeが設定されていない場合、過去の日付は締切時間を過ぎているとみなす
-      const orderDateObj = new Date(orderDate + "T00:00:00");
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return orderDateObj < today;
-    }
-
-    const orderDateObj = new Date(orderDate + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isToday = orderDateObj.getTime() === today.getTime();
-
+    // JST（UTC+9）で現在時刻を取得
+    const now = new Date();
+    const jstOffset = 9 * 60 * 60 * 1000; // JSTはUTC+9
+    const jstNow = new Date(now.getTime() + jstOffset);
+    
+    // 今日の日付をJSTで取得（YYYY-MM-DD形式）
+    const year = jstNow.getUTCFullYear();
+    const month = String(jstNow.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jstNow.getUTCDate()).padStart(2, '0');
+    const todayJSTStr = `${year}-${month}-${day}`;
+    
     // 過去の日付は締切時間を過ぎている
-    if (orderDateObj < today) {
+    if (orderDate < todayJSTStr) {
       return true;
     }
+    
+    if (!deadlineTime) {
+      // deadline_timeが設定されていない場合、過去の日付は締切時間を過ぎているとみなす
+      // 既に過去の日付チェックは上で行っているので、ここでは今日以降はfalse
+      return false;
+    }
 
-    // 今日の日付の場合、現在時刻と締切時刻を比較
-    if (isToday) {
-      const now = new Date();
+    // 今日の日付の場合、現在時刻と締切時刻を比較（JST）
+    if (orderDate === todayJSTStr) {
       const [hours, minutes] = deadlineTime.split(":").map(Number);
-      const deadline = new Date(today);
-      deadline.setHours(hours, minutes, 0, 0);
-
-      return now >= deadline;
+      // JSTの今日の締切時刻をUTCに変換して作成
+      // JSTの時刻から9時間を引いてUTCに変換
+      let utcHours = hours - 9;
+      let utcDate = jstNow.getUTCDate();
+      let utcMonth = jstNow.getUTCMonth();
+      let utcYear = year;
+      
+      // 時刻が負の場合は前日に繰り下げ
+      if (utcHours < 0) {
+        utcHours += 24;
+        utcDate -= 1;
+        if (utcDate < 1) {
+          utcMonth -= 1;
+          if (utcMonth < 0) {
+            utcMonth = 11;
+            utcYear -= 1;
+          }
+          utcDate = new Date(utcYear, utcMonth + 1, 0).getDate();
+        }
+      }
+      
+      const deadlineUTC = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHours, minutes, 0));
+      
+      // UTCの現在時刻と比較
+      return now >= deadlineUTC;
     }
 
     // 未来の日付は締切時間を過ぎていない
