@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import DateCalendar from './date-calendar'
+import ChangeUserButton from './change-user-button'
 
 /**
  * 注文一覧ページ（日付指定可能）
@@ -365,12 +366,20 @@ export default async function TodayOrdersPage({
                                     ¥{order.total_price.toLocaleString()}
                                   </td>
                                   <td className="px-4 py-2 text-center">
-                                    <Link
-                                      href={`/orders/${order.id}/edit?user_id=${order.user_id}`}
-                                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-                                    >
-                                      詳細
-                                    </Link>
+                                    <div className="flex items-center justify-center gap-2">
+                                      <Link
+                                        href={`/orders/${order.id}/edit?user_id=${order.user_id}`}
+                                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                      >
+                                        詳細
+                                      </Link>
+                                      <span className="text-gray-300">|</span>
+                                      <ChangeUserButton
+                                        orderId={order.id}
+                                        currentUserId={order.user_id}
+                                        currentUserName={order.user_name}
+                                      />
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
