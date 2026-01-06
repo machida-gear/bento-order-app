@@ -3272,6 +3272,77 @@
 
 ---
 
+## 2026-01-XX（UI改善、タイムゾーン問題修正、データベース接続最適化）
+
+### 実装内容
+
+UIの改善、タイムゾーン問題の修正、データベース接続の最適化を実施しました。
+
+#### UI改善
+
+- **ログイン画面の年表記更新**: フッターの「© 2024 お弁当注文システム」を「© 2026 お弁当注文システム」に変更
+
+#### パスワードリセットメールのリンク問題修正
+
+- **問題**: パスワードリセットメールのリンクがローカルURL（`http://localhost:3000`）になってしまう
+- **原因**: `NEXT_PUBLIC_SITE_URL`環境変数が設定されていない場合、`window.location.origin`が使用されていた
+- **解決策**: 
+  - コードを改善し、`NEXT_PUBLIC_SITE_URL`が設定されていない場合の警告を追加
+  - `env.example`に詳細な説明を追加
+  - VercelとSupabase Dashboardの両方で設定が必要であることを明記
+
+#### タイムゾーン問題の修正
+
+- **問題**: 本番環境（UTC）とローカル環境（JST）で、注文履歴画面の締切時刻判定が異なっていた
+- **原因**: `isAfterDeadline`関数で、UTCとJSTの混在による日付・時刻の比較が正しく行われていなかった
+- **解決策**: 
+  - `app/(user)/orders/page.tsx`の`isAfterDeadline`関数を修正
+  - JST（UTC+9）で統一して日付と時刻を比較するように変更
+  - 本番環境とローカル環境で同じ動作になることを確認
+
+#### データベース接続の最適化
+
+- **DATABASE_URLユーティリティの追加**: 
+  - `lib/utils/database.ts`を作成
+  - `getDatabaseUrl()`と`getDatabaseUrlOptional()`関数を追加
+  - サーバーサイドでのみ使用可能な環境変数の安全な取得を実装
+
+- **Transaction connection (6543)のサポート追加**: 
+  - `pg`ライブラリをインストール
+  - `lib/database/pool.ts`: 接続プールの管理（Transaction connection使用）
+  - `lib/database/query.ts`: クエリヘルパー関数（`queryDatabase()`、`transaction()`）
+  - `docs/Transaction接続の使用方法.md`: 使用方法の詳細ドキュメント
+  - 接続プールを活用することで、パフォーマンスが向上（特に複数のクエリを実行する場合）
+
+### 修正ファイル
+
+- `app/(auth)/login/page.tsx`: 
+  - 年表記を2026に更新
+  - パスワードリセットメールのリンク生成ロジックを改善
+- `app/(user)/orders/page.tsx`: 
+  - `isAfterDeadline`関数を修正（JSTで統一）
+- `lib/utils/database.ts`: DATABASE_URL取得ユーティリティ（新規作成）
+- `lib/database/pool.ts`: 接続プール管理（新規作成）
+- `lib/database/query.ts`: クエリヘルパー関数（新規作成）
+- `env.example`: DATABASE_URLの説明を追加・更新
+- `package.json`: `pg`と`@types/pg`を追加
+
+### 確認事項
+
+- ✅ ログイン画面の年表記が2026に更新されている
+- ✅ パスワードリセットメールのリンクが本番環境のURLになる（`NEXT_PUBLIC_SITE_URL`設定時）
+- ✅ 本番環境とローカル環境で、注文履歴画面の締切時刻判定が同じ動作になる
+- ✅ DATABASE_URLを安全に取得できる
+- ✅ Transaction connection (6543)を使用したデータベース接続が可能
+
+### 注意事項
+
+- **パスワードリセットメール**: VercelとSupabase Dashboardの両方で`NEXT_PUBLIC_SITE_URL`とSite URLを設定する必要があります
+- **タイムゾーン**: すべての日付・時刻比較はJST（UTC+9）で統一されています
+- **データベース接続**: Transaction connection (6543)はオプション機能です。既存のSupabaseクライアントと併用できます
+
+---
+
 ## 変更履歴の記録ルール
 
 - 日付は `YYYY-MM-DD` 形式で記載
