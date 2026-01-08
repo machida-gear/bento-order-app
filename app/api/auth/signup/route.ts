@@ -146,15 +146,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
     }
 
-    if (authError) {
-      const translatedError = translateAuthError(authError.message)
-      return NextResponse.json({ error: translatedError }, { status: 400 })
-    }
-
-    if (!authData.user) {
-      return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
-    }
-
     // 2. profiles テーブルにレコードを作成
     // Service Role Keyを使用してRLSをバイパス
     

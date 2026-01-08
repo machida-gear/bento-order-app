@@ -111,7 +111,13 @@ export default async function CalendarPage({
   const endDateStr = formatDateLocal(lastDayOfMonth);
 
   // Transaction connectionを使用してデータを取得（パフォーマンス向上）
-  const { orderDays, orders, systemSettings, calendarError, ordersError } = await queryDatabase(async (client) => {
+  const { orderDays, orders, systemSettings, calendarError, ordersError } = await queryDatabase(async (client): Promise<{
+    orderDays: any[];
+    orders: any[];
+    systemSettings: any;
+    calendarError: Error | null;
+    ordersError: Error | null;
+  }> => {
     // カレンダーデータを取得
     const calendarResult = await client.query(
       `SELECT * FROM order_calendar 
@@ -324,7 +330,7 @@ export default async function CalendarPage({
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           <p className="font-medium">データの取得に失敗しました</p>
           <p className="text-xs mt-1">
-            {(calendarError || ordersError)?.message}
+            {(calendarError as Error | null)?.message || (ordersError as Error | null)?.message || 'エラーが発生しました'}
           </p>
         </div>
       )}
