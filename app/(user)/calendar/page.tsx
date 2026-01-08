@@ -94,10 +94,10 @@ export default async function CalendarPage({
         .from("profiles")
         .select("id, full_name, is_active")
         .eq("id", params.user_id)
-        .single();
+        .single() as { data: { id: string; full_name: string; is_active: boolean } | null; error: any };
 
       if (targetProfileResult.data) {
-        const profileData = targetProfileResult.data as { id: string; full_name: string; is_active: boolean };
+        const profileData = targetProfileResult.data;
         targetUserId = params.user_id;
         targetProfile = profileData;
       }
@@ -216,7 +216,7 @@ export default async function CalendarPage({
           .from("profiles")
           .select("id, full_name, is_active")
           .eq("id", params.user_id)
-          .single();
+          .single() as { data: { id: string; full_name: string; is_active: boolean } | null; error: any };
 
         if (targetProfileResult.data) {
           targetUserId = params.user_id;
