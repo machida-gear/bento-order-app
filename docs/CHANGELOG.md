@@ -6,7 +6,169 @@
 
 ---
 
-## 2026-01-XX（audit_logs.actor_id 外部キー制約修正：ユーザー削除時の監査ログ保持）
+## 2026-01-XX（パスワードリセット機能の実装とフッターの変更）
+
+### パスワードリセット機能の実装
+
+#### 問題
+
+- パスワードリセットメールが届き、リンクをクリックしても、ログイン画面にリダイレクトされるだけでパスワードのリセットができない
+- メール内のリンクから新しいパスワードを設定する機能が実装されていなかった
+
+#### 解決策
+
+Supabaseのパスワードリセットフローに従って、メール内のリンクから新しいパスワードを設定する機能を実装しました。
+
+1. **URLハッシュからのトークン検出**
+   - Supabaseのパスワードリセットリンクは、URLハッシュに`#access_token=...&type=recovery`を含みます
+   - `useEffect`フックを使用して、ページ読み込み時にURLハッシュをチェック
+   - `type=recovery`と`access_token`が存在する場合、パスワード更新モードに切り替え
+
+2. **パスワード更新フォームの追加**
+   - 新しいパスワード入力欄（6文字以上）
+   - パスワード確認入力欄
+   - バリデーション（パスワードとパスワード確認の一致確認）
+   - エラーメッセージの日本語化
+
+3. **パスワード更新処理**
+   - `supabase.auth.updateUser({ password: newPassword })`でパスワードを更新
+   - 更新成功後、成功メッセージを表示
+   - 3秒後にログイン画面に自動リダイレクト
+
+#### 修正ファイル
+
+- `app/(auth)/login/page.tsx`: パスワードリセット機能の実装
+  - `useSearchParams`と`useEffect`をインポート
+  - `newPassword`、`confirmPassword`、`isUpdatePassword`ステートを追加
+  - URLハッシュからトークンを検出する`useEffect`フックを追加
+  - `handleUpdatePassword`関数を追加
+  - パスワード更新フォームを追加
+  - パスワード更新モードの表示制御を追加
+
+### フッターの変更
+
+#### 実装内容
+
+- フッターのテキストを「© 2026 お弁当注文システム」から「© 2026 MACHIDA GEAR」に変更
+- タイトル（「お弁当注文システム」）は変更なし
+
+#### 修正ファイル
+
+- `app/(auth)/login/page.tsx`: フッターのテキストを変更
+
+### 確認事項
+
+- ✅ パスワードリセットメールが正しく送信される
+- ✅ メール内のリンクをクリックすると、パスワード更新フォームが表示される
+- ✅ 新しいパスワードとパスワード確認を入力してパスワードを更新できる
+- ✅ パスワードは6文字以上で入力される必要がある
+- ✅ パスワードとパスワード確認が一致しない場合はエラーが表示される
+- ✅ パスワード更新成功後、ログイン画面に自動リダイレクトされる
+- ✅ エラーメッセージが日本語で表示される
+- ✅ フッターが「© 2026 MACHIDA GEAR」に変更されている
+
+### Supabaseメールテンプレートの設定方法
+
+#### 実装内容
+
+Supabaseのメールテンプレートでは、`{{ .ConfirmationURL }}`という変数が使用されます。この変数は**自動的に生成される**ため、手動で設定する必要はありません。
+
+#### メールテンプレートの設定
+
+1. **Supabase Dashboardでの確認・編集**
+   - Supabase Dashboard > Authentication > Email Templates > Reset Password
+   - テンプレート例: `<p><a href="{{ .ConfirmationURL }}">お弁当注文システムのパスワードをリセット</a></p>`
+   - `{{ .ConfirmationURL }}`はそのまま使用（変更不要）
+
+2. **必要な設定**
+   - Supabase Dashboard > Authentication > URL Configuration:
+     - **Site URL**: 本番環境のURL（例: `https://bento-order-app-blond.vercel.app`）
+     - **Redirect URLs**: 本番環境のURLを追加（例: `https://bento-order-app-blond.vercel.app/**`）
+   - 環境変数: `NEXT_PUBLIC_SITE_URL`を本番環境のURLに設定
+
+3. **動作の仕組み**
+   - コード側（`app/(auth)/login/page.tsx`）で`redirectTo`パラメータを指定
+   - Supabaseが`{{ .ConfirmationURL }}`を自動生成（`https://[PROJECT-ID].supabase.co/auth/v1/verify?token=...&type=recovery&redirect_to=[redirectUrl]`の形式）
+   - メール内のリンクに`{{ .ConfirmationURL }}`が含まれる
+   - ユーザーがリンクをクリックすると、Supabaseの認証サーバーでトークンを検証後、`/login?reset=true`にリダイレクト
+
+#### 修正ファイル
+
+- `docs/パスワードリセット機能の実装.md`: メールテンプレート設定方法を追加
+- `docs/環境変数設定手順.md`: Supabaseメールテンプレート設定方法を追加
+
+### ドキュメントの追加
+
+- `docs/パスワードリセット機能の実装.md`: 実装内容の詳細を記録（メールテンプレート設定方法を含む）
+
+---
+
+## 2026-01-XX（型エラー修正と招待コード使用回数リセット機能の修正）
+
+### 問題
+
+- Vercelデプロイ時にTypeScriptの型エラーが発生してビルドが失敗する
+- 招待コード管理画面でリセットボタンを押しても使用回数がリセットされない
+
+### 原因
+
+1. **型エラーの原因**
+   - `app/(user)/calendar/page.tsx`: `calendarError` と `ordersError` が常に `null` として定義されており、TypeScriptが型推論で `never` 型として判定
+   - `app/api/auth/signup/route.ts`: `authError` の重複チェックがあり、型推論で問題が発生
+
+2. **招待コードリセット機能の原因**
+   - API側で招待コードが**変更された場合のみ**使用回数をリセットする仕様になっていた
+   - リセットボタンは現在のコードをそのまま送信するため、変更がないと判定されてリセットされなかった
+
+### 解決策
+
+#### 1. 型エラーの修正
+
+- **`app/(user)/calendar/page.tsx`**: `queryDatabase` の戻り値の型を明示的に定義（`Error | null`）
+- **`app/(user)/calendar/page.tsx`**: エラーメッセージ表示時に型アサーションを使用
+- **`app/api/auth/signup/route.ts`**: 冗長な `authError` チェック（149-152行目）を削除
+
+#### 2. 招待コード使用回数リセット機能の修正
+
+- **`app/api/admin/invitation-code/route.ts`**: `reset_usage_count` パラメータを追加
+- **`app/api/admin/invitation-code/route.ts`**: `reset_usage_count === true` の場合、招待コードが変更されていなくても使用回数をリセット
+- **`app/admin/invitation-code/page.tsx`**: リセットボタン押下時に `reset_usage_count: true` をリクエストに含める
+
+### 修正ファイル
+
+- `app/(user)/calendar/page.tsx`: 型定義の明示化
+- `app/api/auth/signup/route.ts`: 冗長なエラーチェックの削除
+- `app/admin/invitation-code/page.tsx`: リセットリクエストの修正
+- `app/api/admin/invitation-code/route.ts`: `reset_usage_count` パラメータの追加
+
+### 確認事項
+
+- ✅ TypeScriptのビルドが成功する
+- ✅ 招待コード使用回数のリセットボタンが正常に動作する
+- ✅ デプロイが正常に完了する
+
+---
+
+## 2026-01-XX（新規ユーザー登録時のメッセージ改善とaudit_logs.actor_id外部キー制約修正）
+
+### 新規ユーザー登録時のメッセージ改善
+
+#### 問題
+
+- 新規ユーザー登録時に「管理者の承認をお待ちください」というメッセージが表示されるが、メール確認が必要であることが明示されていない
+- ユーザーがメール内のリンクをクリックして確認する必要があることが伝わらない
+
+#### 解決策
+
+- 登録完了メッセージに「確認メールを送信しましたので、メール内のリンクをクリックしてメールアドレスの確認を完了してください」という文言を追加
+- メール確認 → 管理者承認の順序を明確に表示
+
+#### 修正ファイル
+
+- `app/(auth)/login/page.tsx`: 登録完了メッセージの改善
+- `app/api/auth/signup/route.ts`: APIレスポンスメッセージの改善
+
+### audit_logs.actor_id 外部キー制約修正：ユーザー削除時の監査ログ保持
 
 ### 問題
 

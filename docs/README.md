@@ -73,6 +73,8 @@
 | [Transaction 接続の使用方法.md](./Transaction接続の使用方法.md)                                              | Transaction connection (6543)の使用方法とパフォーマンス最適化 | CHANGELOG.md, 環境変数設定手順.md                    |
 | [Transaction接続対応_注文機能の最適化.md](./Transaction接続対応_注文機能の最適化.md)                         | Transaction connection対応：注文機能の最適化                  | CHANGELOG.md, PROGRESS.md, Transaction接続の使用方法.md |
 | [audit_logs外部キー制約修正_ユーザー削除時の監査ログ保持.md](./audit_logs外部キー制約修正_ユーザー削除時の監査ログ保持.md) | audit_logs.actor_id 外部キー制約修正（ON DELETE SET NULL）    | CHANGELOG.md, SPEC.md, DECISIONS.md |
+| [招待コード使用回数リセット機能修正_型エラー修正.md](./招待コード使用回数リセット機能修正_型エラー修正.md) | 招待コードリセット機能修正とTypeScript型エラー修正            | CHANGELOG.md, 新規登録制限機能の実装.md |
+| [パスワードリセット機能の実装.md](./パスワードリセット機能の実装.md) | パスワードリセット機能の実装（メール内リンクからのパスワード更新、メールテンプレート設定方法含む） | CHANGELOG.md, PROGRESS.md, SPEC.md, 環境変数設定手順.md |
 
 ### 運用・設定ドキュメント
 
@@ -190,4 +192,4 @@ docs/TODO.md
 
 ---
 
-最終更新日: 2026-01-XX（audit_logs.actor_id 外部キー制約修正完了時点）
+最終更新日: 2026-01-XX（パスワードリセット機能実装、メールテンプレート設定方法追加完了時点）
