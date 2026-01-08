@@ -33,6 +33,14 @@
 - Supabase Auth を使用（Email/Password 認証）
 - 新規登録時は `profiles` テーブルに自動的にレコードが作成される
 - 未認証ユーザーは保護されたルートにアクセスできない（ミドルウェアでリダイレクト）
+- **メール確認**: Supabase Authのデフォルト動作では、メール確認が必要です
+  - 新規登録時に確認メールが送信されます
+  - メール内のリンクをクリックしてメールアドレスを確認する必要があります
+  - メール確認前はログインできません（仕様）
+  - メール確認後、ログインできるようになります
+  - メール確認URLは`NEXT_PUBLIC_SITE_URL`環境変数から生成されます（本番環境では必ず設定が必要）
+  - Supabase Dashboardの「Site URL」と「Redirect URLs」も本番環境のURLに設定する必要があります
+  - 開発環境でメール確認を無効化したい場合は、Supabase Dashboard > Authentication > Settings > 「Enable email confirmations」のチェックを外す（本番環境では推奨しません）
 
 ### 新規登録制限機能
 
@@ -130,6 +138,8 @@
   - 管理者モード: `user_id`パラメータが指定されている場合
   - 管理画面からカレンダーを開く場合: 管理者モード
   - ユーザー画面からカレンダーを開く場合: ユーザーモード
+- **Transaction connection対応**: 注文作成処理はTransaction connection (6543)を使用してトランザクション保証（データ整合性確保、パフォーマンス向上）
+- **Transaction connection対応**: 注文作成処理はTransaction connection (6543)を使用してトランザクション保証（データ整合性確保、パフォーマンス向上）
 
 ### 注文のキャンセル
 
@@ -139,6 +149,8 @@
 - 注文編集画面からキャンセル可能
 - 注文履歴画面では、一般ユーザーの場合、締切時刻を過ぎた注文のキャンセルボタンは非表示
 - キャンセル処理中に締切時刻を過ぎた場合は、エラーメッセージを表示
+- **Transaction connection対応**: 注文キャンセル処理はTransaction connection (6543)を使用してトランザクション保証（データ整合性確保、パフォーマンス向上）
+- **Transaction connection対応**: 注文キャンセル処理はTransaction connection (6543)を使用してトランザクション保証（データ整合性確保、パフォーマンス向上）
 
 ### 注文の削除（管理者のみ）
 
@@ -290,7 +302,7 @@ LIMIT 1;
 
 - **記録対象**: すべての重要な操作（注文作成・更新・キャンセル、価格・業者・メニュー・カレンダー・ユーザー・システム設定の管理操作、PDF生成、CSV出力など）
 - **記録項目**:
-  - `actor_id`: 実行ユーザー ID
+  - `actor_id`: 実行ユーザー ID（`auth.users(id)` を参照、`ON DELETE SET NULL`）
   - `action`: アクション種別（例: `order.create`、`order.cancel`、`price.create`、`vendor.update`、`pdf.generate`、`csv.download`、`csv.download.by_user`など）
   - `target_table`: 対象テーブル名
   - `target_id`: 対象レコード ID
@@ -299,6 +311,7 @@ LIMIT 1;
   - `created_at`: 実行日時
 - **参照権限**: 管理者のみ参照可能（全ユーザーが記録は可能）
 - **ログ閲覧画面**: `/admin/logs`で管理者がすべての操作ログを閲覧可能
+- **ユーザー削除時の動作**: Authユーザーを削除した場合、`actor_id` は自動的に NULL になるが、監査ログの行自体は保持される（`ON DELETE SET NULL`）
 
 ### セキュリティ方針
 
@@ -340,6 +353,15 @@ LIMIT 1;
 - **get_cutoff_time(order_date)**: 指定日付の締切時刻を取得（デフォルト: システム設定から取得）
 - **is_before_cutoff(order_date)**: 指定日付の注文が締切前かどうかを判定（DB 時刻基準、JST 固定）
 
+### データベース接続
+
+- **Transaction connection (6543)**: パフォーマンスが重要なクエリやトランザクションが必要な処理で使用
+  - 接続プールを活用し、複数のクエリを同じ接続で実行することで、接続確立のオーバーヘッドを削減
+  - 注文作成・更新・キャンセル処理はトランザクション内で実行し、データ整合性を確保
+  - JOINクエリを使用して、Supabaseのネストしたクエリと同等のデータを効率的に取得
+  - 既存のSupabaseクライアントと併用可能で、段階的に移行できる
+  - **注意**: RLSは直接PostgreSQL接続では自動適用されないため、適切な権限チェックを実装
+
 ### システム設定
 
 - **system_settings テーブル**: システム全体の設定を管理（シングルトン、id=1 のみ）
@@ -355,21 +377,12 @@ LIMIT 1;
   - 本番環境: `https://bento-order-app-blond.vercel.app`
   - 開発環境: 設定不要（デフォルトで `http://localhost:3000` が使用される）
   - **重要**: Supabase Dashboardの`Site URL`設定も本番環境のURLに設定する必要があります
-- **company_name**: 自社の会社名（PDF 生成時に使用）
-- **company_postal_code**: 自社の郵便番号（PDF 生成時に使用）
-- **company_address1**: 自社の住所（1 行目）（PDF 生成時に使用）
-- **company_address2**: 自社の住所（2 行目）（PDF 生成時に使用）
-- **company_phone**: 自社の電話番号（PDF 生成時に使用）
-- **company_fax**: 自社の FAX 番号（PDF 生成時に使用）
-- **company_email**: 自社のメールアドレス（PDF 生成時に使用）
-
-### 環境変数
-
-- **NEXT_PUBLIC_SITE_URL**: 本番環境のサイトURL（メール内のリンクに使用）
-  - 本番環境: `https://bento-order-app-blond.vercel.app`
-  - 開発環境: 設定不要（デフォルトで `http://localhost:3000` が使用される）
-  - **重要**: Supabase Dashboardの`Site URL`設定も本番環境のURLに設定する必要があります
   - **用途**: 新規登録時の確認メールやパスワードリセットメール内のリンクURLに使用
+- **DATABASE_URL**: Transaction connection (6543)の接続文字列（オプション、パフォーマンス向上のため推奨）
+  - Supabase Dashboard > Project Settings > Database > Connection string > **Transaction** から取得
+  - 形式: `postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:6543/postgres?pgbouncer=true`
+  - **用途**: パフォーマンスが重要なクエリやトランザクションが必要な処理で使用
+  - **注意**: サーバーサイドでのみ使用可能、RLSは自動適用されないため適切な権限チェックが必要
 
 ---
 
@@ -387,6 +400,7 @@ LIMIT 1;
 - **デスクトップ表示**: カレンダー全体が一画面で表示されるようにセルサイズを調整（横幅 1.2 倍、高さとパディングを縮小）
 - **レイアウト**: ヘッダーとタイトルの間の空間を最小限に調整
 - **セルサイズ**: 注文の有無に関わらずセルサイズが一定（スマホで画面に収まるように最適化）
+- **Transaction connection対応**: データ取得処理はTransaction connection (6543)を使用してパフォーマンス向上
 
 ### 注文画面
 
@@ -401,6 +415,7 @@ LIMIT 1;
 - **キャンセルボタン**: 注文済み（`status = 'ordered'`）の注文に表示
 - **キャンセルボタンの表示制御**: 締切時刻を過ぎた注文のキャンセルボタンは非表示
 - **エラーメッセージ**: キャンセル処理中に締切時刻を過ぎた場合は、エラーメッセージを表示
+- **Transaction connection対応**: データ取得処理はTransaction connection (6543)を使用してパフォーマンス向上（JOINクエリで効率化）
 
 ### 管理者画面
 

@@ -281,6 +281,16 @@
 - [ ] 統合テスト（認証フロー、注文フロー）
 - [ ] E2E テスト（主要シナリオ）
 
+#### 20. Transaction connection (6543)対応
+
+- [x] 注文カレンダー（`app/(user)/calendar/page.tsx`）をTransaction connectionに対応
+- [x] 新規注文API（`app/api/orders/route.ts`）をTransaction connectionに対応
+- [x] 注文変更API（`app/api/orders/[id]/route.ts`）をTransaction connectionに対応
+- [x] 注文履歴画面（`app/(user)/orders/page.tsx`）をTransaction connectionに対応
+- [ ] 管理者機能へのTransaction connection適用（カレンダー管理、業者・メニュー・価格管理、レポート）
+- [ ] 自動注文機能へのTransaction connection適用
+- [ ] ユーザー管理機能へのTransaction connection適用
+
 ---
 
 ## 優先度: 低（将来の拡張）

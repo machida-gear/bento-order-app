@@ -11,7 +11,8 @@ function translateAuthError(message: string): string {
   const errorMessages: { [key: string]: string } = {
     "Invalid login credentials":
       "メールアドレスまたはパスワードが正しくありません",
-    "Email not confirmed": "メールアドレスが確認されていません",
+    "Email not confirmed":
+      "メールアドレスが確認されていません。登録時に送信されたメール内のリンクをクリックして、メールアドレスを確認してください。",
     "User not found": "ユーザーが見つかりません",
     "Invalid email": "メールアドレスの形式が正しくありません",
     "Password is too weak": "パスワードが弱すぎます",
@@ -30,7 +31,7 @@ function translateAuthError(message: string): string {
     return "メールアドレスまたはパスワードが正しくありません";
   }
   if (message.toLowerCase().includes("email not confirmed")) {
-    return "メールアドレスが確認されていません";
+    return "メールアドレスが確認されていません。登録時に送信されたメール内のリンクをクリックして、メールアドレスを確認してください。";
   }
   if (message.toLowerCase().includes("user not found")) {
     return "ユーザーが見つかりません";
@@ -151,7 +152,7 @@ export default function LoginPage() {
 
       if (data.pending_approval) {
         setSuccess(
-          "アカウントを作成しました。管理者の承認をお待ちください。承認が完了すると、ログインできるようになります。"
+          "アカウントを作成しました。確認メールを送信しましたので、メール内のリンクをクリックしてメールアドレスの確認を完了してください。その後、管理者の承認をお待ちください。承認が完了すると、ログインできるようになります。"
         );
       } else {
         setSuccess(
@@ -191,17 +192,17 @@ export default function LoginPage() {
       // 本番環境のURLを環境変数から取得
       // 本番環境では必ずNEXT_PUBLIC_SITE_URLを設定すること
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-      
+
       if (!siteUrl) {
         // 開発環境の場合のみ警告を表示
-        if (window.location.origin.includes('localhost')) {
+        if (window.location.origin.includes("localhost")) {
           console.warn(
-            'NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。'
+            "NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。"
           );
         }
       }
 
-      const redirectUrl = siteUrl 
+      const redirectUrl = siteUrl
         ? `${siteUrl}/login?reset=true`
         : `${window.location.origin}/login?reset=true`;
 

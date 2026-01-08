@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { queryDatabase } from "@/lib/database/query";
 import CalendarGrid from "@/components/calendar-grid";
 
 /**
@@ -23,42 +24,50 @@ export default async function CalendarPage({
   // Next.js 16ではsearchParamsがPromise型のため、awaitで解決
   const params = await searchParams;
 
-  // 管理者権限をチェック（Service Role Keyを使用してRLSをバイパス）
-  const { data: currentProfile } = await supabaseAdmin
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
+  // Transaction connectionを使用してデータを取得（パフォーマンス向上）
+  const calendarData = await queryDatabase(async (client) => {
+    // 現在のユーザーのプロフィールを取得（管理者権限チェック）
+    const profileResult = await client.query(
+      'SELECT role, full_name FROM profiles WHERE id = $1',
+      [user.id]
+    );
+    const currentProfile = profileResult.rows[0] as { role?: string; full_name?: string } | undefined;
+    const isAdmin = currentProfile?.role === "admin";
 
-  const isAdmin = (currentProfile as { role?: string } | null)?.role === "admin";
+    // 管理者モードの判定
+    const isAdminMode = isAdmin && params.user_id !== undefined;
 
-  // 管理者モードの判定: user_idパラメータが指定されている場合（管理者権限がある場合のみ許可）
-  const isAdminMode = isAdmin && params.user_id !== undefined;
+    // 対象ユーザーIDを決定
+    let targetUserId = user.id;
+    let targetProfile: {
+      id: string;
+      full_name: string;
+      is_active: boolean;
+    } | null = null;
 
-  // 対象ユーザーIDを決定（管理者モードの場合はuser_idパラメータを使用、それ以外は現在のユーザーID）
-  let targetUserId = user.id;
-  let targetProfile: {
-    id: string;
-    full_name: string;
-    is_active: boolean;
-  } | null = null;
+    if (isAdminMode && params.user_id) {
+      // 管理者モードの場合、指定されたユーザーIDが存在するか確認
+      const targetProfileResult = await client.query(
+        'SELECT id, full_name, is_active FROM profiles WHERE id = $1',
+        [params.user_id]
+      );
 
-  if (isAdminMode && params.user_id) {
-    // 管理者モードの場合、指定されたユーザーIDが存在するか確認（Service Role Keyを使用）
-    const { data: profileData } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, is_active")
-      .eq("id", params.user_id)
-      .single();
-
-    if (profileData) {
-      targetUserId = params.user_id;
-      targetProfile = profileData as { id: string; full_name: string; is_active: boolean };
-    } else {
-      // 指定されたユーザーIDが存在しない場合は、現在のユーザーIDを使用
-      targetUserId = user.id;
+      if (targetProfileResult.rows.length > 0) {
+        const profileData = targetProfileResult.rows[0] as { id: string; full_name: string; is_active: boolean };
+        targetUserId = params.user_id;
+        targetProfile = profileData;
+      }
     }
-  }
+
+    return {
+      isAdmin,
+      isAdminMode,
+      targetUserId,
+      targetProfile,
+    };
+  });
+
+  const { isAdmin, isAdminMode, targetUserId, targetProfile } = calendarData;
 
   // URLパラメータから年月を取得（なければ現在の年月）
   // monthは1-12で統一（URLでも1-12、表示でも1-12）
@@ -101,147 +110,124 @@ export default async function CalendarPage({
   const startDateStr = formatDateLocal(firstDayOfMonth);
   const endDateStr = formatDateLocal(lastDayOfMonth);
 
-  // カレンダーデータを取得
-  const { data: orderDays, error: calendarError } = await supabase
-    .from("order_calendar")
-    .select("*")
-    .gte("target_date", startDateStr)
-    .lte("target_date", endDateStr)
-    .order("target_date", { ascending: true });
+  // Transaction connectionを使用してデータを取得（パフォーマンス向上）
+  const { orderDays, orders, systemSettings, calendarError, ordersError } = await queryDatabase(async (client) => {
+    // カレンダーデータを取得
+    const calendarResult = await client.query(
+      `SELECT * FROM order_calendar 
+       WHERE target_date >= $1 AND target_date <= $2 
+       ORDER BY target_date ASC`,
+      [startDateStr, endDateStr]
+    );
+    const orderDays = calendarResult.rows;
 
-  // 注文データを取得（menu_item_idを使用）
-  // 注意: 型定義ではmenu_idだが、実際のDBではmenu_item_id（bigint型）
-  // 管理者の場合は対象ユーザーIDで取得、一般ユーザーの場合は自分のIDで取得
-  // 管理者が他のユーザーの注文を取得する場合はService Role Keyを使用してRLSをバイパス
-  const ordersQuery =
-    isAdmin && targetUserId !== user.id ? supabaseAdmin : supabase;
+    // 注文データを取得（RLSをバイパスするため、直接PostgreSQL接続を使用）
+    const ordersResult = await client.query(
+      `SELECT * FROM orders 
+       WHERE user_id = $1 AND status = 'ordered' 
+         AND order_date >= $2 AND order_date <= $3 
+       ORDER BY order_date ASC`,
+      [targetUserId, startDateStr, endDateStr]
+    );
+    const orders = ordersResult.rows;
 
-  const { data: orders, error: ordersError } = await ordersQuery
-    .from("orders")
-    .select("*")
-    .eq("user_id", targetUserId)
-    .eq("status", "ordered")
-    .gte("order_date", startDateStr)
-    .lte("order_date", endDateStr)
-    .order("order_date", { ascending: true });
+    // システム設定を取得
+    const settingsResult = await client.query(
+      'SELECT max_order_days_ahead FROM system_settings WHERE id = 1'
+    );
+    const systemSettings = settingsResult.rows[0] || null;
 
-  // システム設定を取得（max_order_days_ahead）
-  const { data: systemSettings } = await supabase
-    .from("system_settings")
-    .select("max_order_days_ahead")
-    .eq("id", 1)
-    .single();
-
-  // エラー処理（エラーはUIで表示されるため、コンソールログは不要）
+    return {
+      orderDays,
+      orders,
+      systemSettings,
+      calendarError: null,
+      ordersError: null,
+    };
+  });
 
   // メニューデータを取得（注文がある場合のみ）
-  // 注文データが存在する場合は、メニューデータが取得できなくても注文を表示する
+  // Transaction connectionを使用してメニューと業者情報を取得
   let ordersWithMenu: Array<any> = [];
   if (orders && orders.length > 0) {
-    // 型定義と実際のDB構造が異なるため、any型を使用
-    const ordersArray = orders as any[];
-
-    // menu_item_idを取得（bigint型は文字列として返される可能性がある）
+    // menu_item_idを取得（bigint型）
     const menuItemIds = [
       ...new Set(
-        ordersArray
-          .map((order) => {
-            // 実際のDBカラム名はmenu_item_id（型定義のmenu_idではない）
+        orders
+          .map((order: any) => {
             const menuItemId = order.menu_item_id || order.menu_id;
             if (!menuItemId) {
               return null;
             }
-            // bigint型は文字列として返される可能性があるため、文字列として扱う
             return String(menuItemId);
           })
-          .filter((id): id is string => id !== null && id !== undefined)
+          .filter((id: string | null): id is string => id !== null && id !== undefined)
       ),
     ];
 
     if (menuItemIds.length > 0) {
-      // bigint型のIDを文字列から数値に変換してクエリ
-      const menuItemIdsAsNumbers = menuItemIds
-        .map((id) => {
-          const num = Number(id);
-          if (isNaN(num)) {
-            return null;
-          }
-          return num;
-        })
-        .filter((id): id is number => id !== null);
-
-      const { data: menuItems, error: menuItemsError } = await supabase
-        .from("menu_items")
-        .select(
-          `
-          id,
-          name,
-          vendor_id,
-          vendors (
-            id,
-            name
-          )
-        `
-        )
-        .in("id", menuItemIdsAsNumbers)
-        .eq("is_active", true); // アクティブなメニューのみ取得
-
-      // 注文データにメニュー情報を結合
-      if (menuItems && menuItems.length > 0) {
-        // メニューIDを文字列に変換してマップを作成（bigint型の比較を確実にするため）
-        const menuItemsMap = new Map(
-          (menuItems as Array<{ id: string | number; name: string; vendor_id: string }>).map((item) => [String(item.id), item])
+      // Transaction connectionを使用してメニューと業者情報を取得
+      const menuData = await queryDatabase(async (client) => {
+        // メニュー情報を取得（JOINで業者情報も取得）
+        const menuResult = await client.query(
+          `SELECT 
+            mi.id, 
+            mi.name, 
+            mi.vendor_id,
+            v.id as vendor_id_from_vendors,
+            v.name as vendor_name
+           FROM menu_items mi
+           LEFT JOIN vendors v ON mi.vendor_id = v.id
+           WHERE mi.id = ANY($1::bigint[]) AND mi.is_active = true`,
+          [menuItemIds.map(id => BigInt(id))]
         );
 
-        ordersWithMenu = ordersArray.map((order) => {
-          // 実際のDBカラム名はmenu_item_id（bigint型）
-          // Supabaseから返される値は数値または文字列の可能性がある
-          const rawMenuItemId = order.menu_item_id ?? order.menu_id;
+        return menuResult.rows.map((row: any) => ({
+          id: String(row.id),
+          name: row.name,
+          vendor_id: String(row.vendor_id),
+          vendors: row.vendor_id_from_vendors ? {
+            id: String(row.vendor_id_from_vendors),
+            name: row.vendor_name,
+          } : null,
+        }));
+      });
 
-          if (!rawMenuItemId) {
-            return {
-              ...order,
-              menu_items: null,
-            };
-          }
+      // メニューIDを文字列に変換してマップを作成
+      const menuItemsMap = new Map(
+        menuData.map((item: any) => [String(item.id), item])
+      );
 
-          // bigint型を文字列に変換してマップから取得
-          const menuItemId = String(rawMenuItemId);
-          const menuItem = menuItemsMap.get(menuItemId);
+      ordersWithMenu = orders.map((order: any) => {
+        const rawMenuItemId = order.menu_item_id ?? order.menu_id;
 
+        if (!rawMenuItemId) {
           return {
             ...order,
-            menu_items: menuItem || null,
+            menu_items: null,
           };
-        });
-      } else {
-        // メニューデータが取得できない場合でも、注文データは表示
-        ordersWithMenu = ordersArray.map((order) => ({
+        }
+
+        const menuItemId = String(rawMenuItemId);
+        const menuItem = menuItemsMap.get(menuItemId);
+
+        return {
           ...order,
-          menu_items: null,
-        }));
-      }
+          menu_items: menuItem || null,
+        };
+      });
     } else {
       // menu_item_idが取得できない場合でも、注文データは表示
-      ordersWithMenu = ordersArray.map((order) => ({
+      ordersWithMenu = orders.map((order: any) => ({
         ...order,
         menu_items: null,
       }));
     }
   }
 
-  // 注文データが存在するが、ordersWithMenuが空の場合の確認
-  if (orders && orders.length > 0 && ordersWithMenu.length === 0) {
-    // フォールバック: メニューデータなしで注文データを作成
-    ordersWithMenu = (orders as any[]).map((order) => ({
-      ...order,
-      menu_items: null,
-    }));
-  }
-
   // 日付をキーとしたマップを作成（高速検索用）
   const orderDaysMap = new Map(
-    ((orderDays || []) as Array<{ target_date: string; is_available: boolean; deadline_time: string | null; note: string | null }>).map((day) => [day.target_date, day])
+    (orderDays || []).map((day: any) => [day.target_date, day])
   );
 
   // 同じ日に複数の注文がある場合、最初の1つを使用（仕様上1日1注文のみ）
@@ -367,7 +353,7 @@ export default async function CalendarPage({
         month={currentMonth}
         orderDaysMap={orderDaysMap}
         ordersMap={ordersMap}
-        maxOrderDaysAhead={(systemSettings as { max_order_days_ahead?: number } | null)?.max_order_days_ahead || 30}
+        maxOrderDaysAhead={systemSettings?.max_order_days_ahead || 30}
         targetUserId={isAdminMode ? targetUserId : undefined}
         isAdminMode={isAdminMode}
       />

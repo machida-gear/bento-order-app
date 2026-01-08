@@ -109,17 +109,42 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // 本番環境のURLを環境変数から取得、なければリクエストのオリジンを fallback として使用
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
+    // 本番環境のURLを環境変数から取得
+    // 本番環境では必ずNEXT_PUBLIC_SITE_URLを設定すること
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    
+    if (!siteUrl) {
+      // 本番環境でNEXT_PUBLIC_SITE_URLが設定されていない場合は警告をログに出力
+      console.warn(
+        '⚠️ NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。'
+      )
+      // 開発環境の場合のみ、リクエストのオリジンを fallback として使用
+      console.warn(`⚠️ フォールバックURLを使用: ${request.nextUrl.origin}`)
+    }
+
+    // メール確認URLの生成
+    // 本番環境では必ずNEXT_PUBLIC_SITE_URLを使用（設定されていない場合はエラーを返す）
+    const emailRedirectUrl = siteUrl 
+      ? `${siteUrl}/calendar`
+      : `${request.nextUrl.origin}/calendar`
 
     // 1. ユーザー登録
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${siteUrl}/calendar`,
+        emailRedirectTo: emailRedirectUrl,
       },
     })
+
+    if (authError) {
+      const translatedError = translateAuthError(authError.message)
+      return NextResponse.json({ error: translatedError }, { status: 400 })
+    }
+
+    if (!authData.user) {
+      return NextResponse.json({ error: 'ユーザー作成に失敗しました' }, { status: 500 })
+    }
 
     if (authError) {
       const translatedError = translateAuthError(authError.message)
@@ -209,7 +234,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'アカウントを作成しました。管理者の承認をお待ちください。確認メールを送信しました。',
+      message: 'アカウントを作成しました。確認メールを送信しましたので、メール内のリンクをクリックしてメールアドレスの確認を完了してください。その後、管理者の承認をお待ちください。',
       user: {
         id: authData.user.id,
         email: authData.user.email,

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { queryDatabase } from "@/lib/database/query";
 import CancelOrderButton from "@/components/cancel-order-button";
 
 /**
@@ -20,32 +21,56 @@ export default async function OrdersPage() {
   startOfMonth.setDate(1);
   const startDate = startOfMonth.toISOString().split("T")[0];
 
-  const { data: orders } = await supabase
-    .from("orders")
-    .select(
-      `
-      *,
-      menu_items (
-        id,
-        name,
-        vendors (
-          id,
-          name
-        )
-      )
-    `
-    )
-    .eq("user_id", user.id)
-    .gte("order_date", startDate)
-    .order("order_date", { ascending: false });
+  // Transaction connectionを使用してデータを取得（パフォーマンス向上）
+  const { orders, orderDays } = await queryDatabase(async (client) => {
+    // 注文データを取得（menu_itemsとvendorsのJOIN）
+    const ordersResult = await client.query(
+      `SELECT 
+        o.*,
+        mi.id as menu_item_id_from_menu,
+        mi.name as menu_item_name,
+        v.id as vendor_id_from_vendor,
+        v.name as vendor_name
+       FROM orders o
+       LEFT JOIN menu_items mi ON o.menu_item_id = mi.id
+       LEFT JOIN vendors v ON mi.vendor_id = v.id
+       WHERE o.user_id = $1 AND o.order_date >= $2
+       ORDER BY o.order_date DESC`,
+      [user.id, startDate]
+    );
 
-  // カレンダー情報を取得（締切時間チェック用）
-  const ordersTyped = orders as Array<{ order_date: string; [key: string]: any }> | null
-  const orderDates = ordersTyped?.map((order) => order.order_date) || [];
-  const { data: orderDays } = await supabase
-    .from("order_calendar")
-    .select("target_date, deadline_time")
-    .in("target_date", orderDates.length > 0 ? orderDates : [""]);
+    // 注文データを整形（Supabaseの形式に合わせる）
+    const orders = ordersResult.rows.map((row: any) => ({
+      ...row,
+      menu_items: row.menu_item_id_from_menu ? {
+        id: String(row.menu_item_id_from_menu),
+        name: row.menu_item_name,
+        vendors: row.vendor_id_from_vendor ? {
+          id: String(row.vendor_id_from_vendor),
+          name: row.vendor_name,
+        } : null,
+      } : null,
+    }));
+
+    // 注文日付のリストを取得
+    const orderDates = orders.map((order: any) => order.order_date).filter(Boolean);
+
+    // カレンダー情報を取得（締切時間チェック用）
+    let orderDays: Array<{ target_date: string; deadline_time: string | null }> = [];
+    if (orderDates.length > 0) {
+      const orderDaysResult = await client.query(
+        `SELECT target_date, deadline_time 
+         FROM order_calendar 
+         WHERE target_date = ANY($1::date[])`,
+        [orderDates]
+      );
+      orderDays = orderDaysResult.rows;
+    }
+
+    return { orders, orderDays };
+  });
+
+  const ordersTyped = orders as Array<{ order_date: string; [key: string]: any }> | null;
 
   // 日付をキーとしたマップを作成
   const orderDaysMap = new Map(

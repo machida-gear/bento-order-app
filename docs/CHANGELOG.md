@@ -6,6 +6,195 @@
 
 ---
 
+## 2026-01-XX（audit_logs.actor_id 外部キー制約修正：ユーザー削除時の監査ログ保持）
+
+### 問題
+
+- Supabase Authユーザー削除時に「Failed to delete selected users: Database error deleting user」エラーが発生
+- 監査ログが残っているユーザーを削除できない
+
+### 原因
+
+- `audit_logs.actor_id` が `auth.users(id)` を参照している外部キー制約が `ON DELETE RESTRICT`（デフォルト）になっていた
+- 監査ログが残っているユーザーを削除しようとすると、データベースが削除を拒否していた
+
+### 解決策
+
+外部キー制約を `ON DELETE SET NULL` に変更することで、ユーザー削除時に：
+- 監査ログは**削除されない**（保持される）
+- `actor_id` は自動的に **NULL** になる
+- ユーザー削除時にエラーが発生しない
+
+### 実装内容
+
+1. **マイグレーションファイルの作成**
+   - `064_check_audit_logs_fk_before_migration.sql`: 実行前の確認SQL
+   - `064_fix_audit_logs_actor_id_fk_set_null.sql`: メインのマイグレーションSQL
+   - `064_verify_audit_logs_fk_after_migration.sql`: 実行後の確認SQL
+   - `064_README_audit_logs_fk_fix.md`: 実行手順ドキュメント
+
+2. **技術的な修正**
+   - 外部キー制約の自動検出機能
+   - `actor_id` カラムを NULL 許可に変更（必要なら）
+   - 外部キー制約を `ON DELETE SET NULL` に変更
+   - 型エラーの修正（`conkey::int[]` → `conkey`）
+
+### マイグレーションファイル
+
+- `supabase/migrations/064_check_audit_logs_fk_before_migration.sql`: 実行前の確認SQL
+- `supabase/migrations/064_fix_audit_logs_actor_id_fk_set_null.sql`: メインのマイグレーションSQL
+- `supabase/migrations/064_verify_audit_logs_fk_after_migration.sql`: 実行後の確認SQL
+- `supabase/migrations/064_README_audit_logs_fk_fix.md`: 実行手順ドキュメント
+
+### 確認事項
+
+- ✅ 外部キー制約が `ON DELETE SET NULL` になっている
+- ✅ `actor_id` カラムが NULL 許可になっている
+- ✅ 整合性チェックで問題がない（孤児レコードがない）
+
+### ドキュメントの追加
+
+- `docs/audit_logs外部キー制約修正_ユーザー削除時の監査ログ保持.md`: 実装内容の詳細を記録
+
+---
+
+## 2026-01-XX（メール確認URLの問題修正とエラーメッセージ改善）
+
+### 問題
+
+- 新規ユーザー登録時に送信されるメール内のリンクがローカルアドレス（`http://localhost:3000`）になってしまう
+- メール確認前のログインができない（Supabase Authのデフォルト動作）
+- メール確認URLが正しく本番環境のURLにならない
+
+### 原因
+
+1. **環境変数の未設定**: `NEXT_PUBLIC_SITE_URL`がVercelで設定されていない、または誤った値が設定されていた
+2. **Supabase Dashboardの設定不備**: Site URLが本番環境のURLに設定されていない
+3. **フォールバックロジックの問題**: `request.nextUrl.origin`を使用していたため、サーバーサイドで実行時にリクエストのオリジンがローカルになる可能性があった
+4. **エラーメッセージの不明確さ**: メール確認が必要であることが明確に伝わっていなかった
+
+### 解決策
+
+#### 1. メール確認URL生成ロジックの改善
+
+- `app/api/auth/signup/route.ts`を修正
+- `NEXT_PUBLIC_SITE_URL`が設定されていない場合に警告ログを出力
+- メール確認URLの生成を明確化（`NEXT_PUBLIC_SITE_URL`を優先、未設定時はフォールバック）
+
+#### 2. エラーメッセージの改善
+
+- `app/(auth)/login/page.tsx`のエラーメッセージを改善
+- 「メールアドレスが確認されていません」というエラーメッセージに、メール確認の方法を追加
+- メール内のリンクをクリックして確認する必要があることを明記
+
+#### 3. ドキュメントの更新
+
+- `docs/環境変数設定手順.md`に以下を追加：
+  - Supabase Dashboardの設定手順（Site URL、Redirect URLs）
+  - メール確認前のログインについての説明
+  - メール確認を無効化する方法（開発環境のみ）
+
+### 修正ファイル
+
+- `app/api/auth/signup/route.ts`: メール確認URL生成ロジックの改善、警告ログの追加
+- `app/(auth)/login/page.tsx`: エラーメッセージの改善（メール確認方法の明記）
+- `docs/環境変数設定手順.md`: Supabase Dashboardの設定手順追加、メール確認についての説明追加
+
+### 設定手順
+
+#### Vercelの環境変数設定
+
+```
+NEXT_PUBLIC_SITE_URL=https://bento-order-app-blond.vercel.app
+```
+
+設定後、必ず再デプロイしてください。
+
+#### Supabase Dashboardの設定
+
+1. Supabase Dashboardにログイン
+2. 左メニューから「Authentication」を選択
+3. 「URL Configuration」セクションを開く
+4. 「Site URL」を本番環境のURLに設定（例: `https://bento-order-app-blond.vercel.app`）
+5. 「Redirect URLs」に本番環境のURLを追加（例: `https://bento-order-app-blond.vercel.app/**`）
+6. 設定を保存
+
+### メール確認前のログインについて
+
+**重要**: Supabase Authのデフォルト動作では、メール確認が必要です。
+
+- メール確認前はログインできません（これは仕様です）
+- 登録時に送信されたメール内のリンクをクリックしてメールアドレスを確認してください
+- メール確認後、ログインできるようになります
+- 開発環境でメール確認を無効化したい場合は、Supabase Dashboard > Authentication > Settings > 「Enable email confirmations」のチェックを外す（本番環境では推奨しません）
+
+### 確認事項
+
+- ✅ Vercelの環境変数で`NEXT_PUBLIC_SITE_URL`が設定されているか
+- ✅ Supabase Dashboardの「Site URL」が本番環境のURLに設定されているか
+- ✅ Supabase Dashboardの「Redirect URLs」に本番環境のURLが追加されているか
+- ✅ 環境変数変更後、Vercelで再デプロイしたか
+
+### 注意事項
+
+- `NEXT_PUBLIC_`プレフィックスが付いた環境変数はブラウザに公開されるため、Vercelで警告アイコンが表示されますが、`NEXT_PUBLIC_SITE_URL`は公開サイトのURLなので問題ありません
+- 機密情報（`SUPABASE_SERVICE_ROLE_KEY`、`AUTO_ORDER_SECRET`など）には`NEXT_PUBLIC_`プレフィックスを付けないでください
+
+---
+
+## 2026-01-XX（Transaction接続対応：注文機能の最適化）
+
+### 実装内容
+
+Transaction connection (6543)を使用して、注文関連の機能を最適化しました。複数のクエリを同じ接続で実行することで、パフォーマンスが向上し、トランザクション保証によりデータ整合性が確保されます。
+
+### 対応した機能
+
+1. **注文カレンダー** (`app/(user)/calendar/page.tsx`)
+   - プロフィール取得、カレンダーデータ取得、注文データ取得、システム設定取得を`queryDatabase`で統合
+   - メニュー・業者情報の取得も`queryDatabase`を使用（JOINで効率化）
+
+2. **新規注文API** (`app/api/orders/route.ts`)
+   - プロフィール取得、システム設定・カレンダー情報取得を`transaction`で統合
+   - 注文作成処理全体を`transaction`で実行（既存注文チェック、キャンセル済み注文削除、メニュー確認、価格取得、注文作成、監査ログ記録）
+
+3. **注文変更API** (`app/api/orders/[id]/route.ts`)
+   - PUT（更新）とPATCH（キャンセル）の両方を`transaction`に対応
+   - プロフィール取得、注文確認、カレンダー情報取得、更新/キャンセル処理、監査ログ記録を`transaction`で統合
+
+4. **注文履歴画面** (`app/(user)/orders/page.tsx`)
+   - 注文データとカレンダー情報を`queryDatabase`で統合
+   - JOINを使用して、`menu_items`と`vendors`の情報を一度のクエリで取得
+
+### 改善点
+
+- **パフォーマンス向上**: 複数のクエリを1つの接続で実行し、接続確立のオーバーヘッドを削減
+- **トランザクション保証**: 注文作成・更新・キャンセル処理をトランザクション内で実行し、データ整合性を確保
+- **JOINクエリの最適化**: SQL JOINを使用して、Supabaseのネストしたクエリと同等のデータを効率的に取得
+- **エラーハンドリング**: 適切なステータスコードとエラーメッセージを返却
+
+### 修正ファイル
+
+- `app/(user)/calendar/page.tsx`: Transaction connection対応
+- `app/api/orders/route.ts`: Transaction connection対応（トランザクション使用）
+- `app/api/orders/[id]/route.ts`: Transaction connection対応（トランザクション使用）
+- `app/(user)/orders/page.tsx`: Transaction connection対応
+
+### 確認事項
+
+- ✅ 注文カレンダーが正常に表示される
+- ✅ 新規注文が正常に作成される
+- ✅ 注文変更が正常に動作する
+- ✅ 注文キャンセルが正常に動作する
+- ✅ 注文履歴が正常に表示される
+- ✅ トランザクション保証により、データ整合性が確保される
+
+### ドキュメントの追加
+
+- `docs/Transaction接続対応_注文機能の最適化.md`: 実装内容の詳細を記録
+
+---
+
 ## 2025-01-XX（Next.js 16.1.1 型エラー修正と Vercel デプロイ対応）
 
 ### Next.js 16.1.1 の型システム変更への対応
@@ -24,20 +213,22 @@
 ### 主な修正パターン
 
 1. **`params` の Promise 型対応**
+
    ```typescript
    // 修正前
    { params }: { params: { id: string } }
-   
+
    // 修正後
    { params }: { params: Promise<{ id: string }> }
    const resolvedParams = await Promise.resolve(params);
    ```
 
 2. **`searchParams` の Promise 型対応**
+
    ```typescript
    // 修正前
    searchParams: { year?: string; month?: string }
-   
+
    // 修正後
    searchParams: Promise<{ year?: string; month?: string }>
    const params = searchParams instanceof Promise ? await searchParams : searchParams;
@@ -45,10 +236,10 @@
 
 3. **型アサーションの追加**
    ```typescript
-   const profileTyped = profile as { 
-     role?: string; 
-     is_active?: boolean; 
-     [key: string]: any 
+   const profileTyped = profile as {
+     role?: string;
+     is_active?: boolean;
+     [key: string]: any;
    } | null;
    ```
 
@@ -58,7 +249,7 @@
 - Vercel へのデプロイが成功
 - ビルドが正常に完了
 
-> 📖 **詳細**: [Next.js16型エラー修正とVercelデプロイ対応.md](./Next.js16型エラー修正とVercelデプロイ対応.md)
+> 📖 **詳細**: [Next.js16 型エラー修正と Vercel デプロイ対応.md](./Next.js16型エラー修正とVercelデプロイ対応.md)
 
 ---
 
@@ -2020,28 +2211,29 @@
 
 ## 2025-01-XX（レポート機能の拡張と監査ログの完全実装）
 
-### ユーザー別合計金額CSV出力機能の追加
+### ユーザー別合計金額 CSV 出力機能の追加
 
 #### 実装内容
 
-- レポート・CSV出力画面から、締日期間中のユーザーごとの合計金額のCSVをダウンロードできる機能を追加
-- 「ユーザー別合計CSV」ダウンロードボタンを追加（「明細CSV」ボタンと並べて表示）
-- ユーザーごとに集計した合計金額をCSV形式で出力
+- レポート・CSV 出力画面から、締日期間中のユーザーごとの合計金額の CSV をダウンロードできる機能を追加
+- 「ユーザー別合計 CSV」ダウンロードボタンを追加（「明細 CSV」ボタンと並べて表示）
+- ユーザーごとに集計した合計金額を CSV 形式で出力
 - 社員コード順にソートして表示
 - 合計行は含めない（ユーザーごとの合計のみ）
 
 #### 実装詳細
 
-1. **新しいAPIエンドポイントの作成**
+1. **新しい API エンドポイントの作成**
+
    - `app/api/admin/reports/csv-by-user/route.ts` を作成
-   - ユーザーごとに集計した合計金額をCSV形式で出力
-   - 既存のCSV APIと同様に、フィルタ（業者・ユーザー）に対応
+   - ユーザーごとに集計した合計金額を CSV 形式で出力
+   - 既存の CSV API と同様に、フィルタ（業者・ユーザー）に対応
 
 2. **レポート画面の更新**
-   - 「ユーザー別合計CSV」ダウンロードボタンを追加
-   - 既存の「明細CSV」ボタンと並べて表示（青色で区別）
+   - 「ユーザー別合計 CSV」ダウンロードボタンを追加
+   - 既存の「明細 CSV」ボタンと並べて表示（青色で区別）
 
-#### CSV出力形式
+#### CSV 出力形式
 
 ```
 社員コード,氏名,合計金額
@@ -2051,59 +2243,61 @@
 
 - 社員コード順にソート
 - 合計行は含めない
-- UTF-8 BOM付き（Excelで正しく開ける）
+- UTF-8 BOM 付き（Excel で正しく開ける）
 - フィルタ（業者・ユーザー）に対応
 
 #### 修正ファイル
 
-- `app/api/admin/reports/csv-by-user/route.ts`: ユーザー別合計金額CSV出力API（新規作成）
-- `app/admin/reports/page.tsx`: 「ユーザー別合計CSV」ダウンロードボタンの追加
+- `app/api/admin/reports/csv-by-user/route.ts`: ユーザー別合計金額 CSV 出力 API（新規作成）
+- `app/admin/reports/page.tsx`: 「ユーザー別合計 CSV」ダウンロードボタンの追加
 
-### PDF生成・CSV出力時の監査ログ記録機能の追加
+### PDF 生成・CSV 出力時の監査ログ記録機能の追加
 
 #### 実装内容
 
-- PDF生成時に監査ログを記録する機能を追加
-- CSV出力（明細・ユーザー別合計）時に監査ログを記録する機能を追加
+- PDF 生成時に監査ログを記録する機能を追加
+- CSV 出力（明細・ユーザー別合計）時に監査ログを記録する機能を追加
 - すべての出力操作を監査ログに記録することで、操作履歴を追跡可能に
 
 #### 実装詳細
 
-1. **PDF生成APIの監査ログ記録**
+1. **PDF 生成 API の監査ログ記録**
+
    - `app/api/admin/orders/today/pdf/route.ts` に監査ログ記録を追加
    - アクション: `pdf.generate`
    - 記録内容:
      - 日付
-     - 業者ID・業者名
+     - 業者 ID・業者名
      - 合計食数
      - 注文件数
 
-2. **CSV出力API（明細）の監査ログ記録**
+2. **CSV 出力 API（明細）の監査ログ記録**
+
    - `app/api/admin/reports/csv/route.ts` に監査ログ記録を追加
    - アクション: `csv.download`
    - 記録内容:
      - 開始日・終了日
-     - 業者ID（フィルタ適用時）
-     - ユーザーID（フィルタ適用時）
+     - 業者 ID（フィルタ適用時）
+     - ユーザー ID（フィルタ適用時）
      - 注文件数
 
-3. **CSV出力API（ユーザー別合計）の監査ログ記録**
+3. **CSV 出力 API（ユーザー別合計）の監査ログ記録**
    - `app/api/admin/reports/csv-by-user/route.ts` に監査ログ記録を追加
    - アクション: `csv.download.by_user`
    - 記録内容:
      - 開始日・終了日
-     - 業者ID（フィルタ適用時）
-     - ユーザーID（フィルタ適用時）
+     - 業者 ID（フィルタ適用時）
+     - ユーザー ID（フィルタ適用時）
      - ユーザー数
 
 #### 監査ログの記録項目
 
-- `actor_id`: 実行ユーザーID
+- `actor_id`: 実行ユーザー ID
 - `action`: アクション種別（`pdf.generate`, `csv.download`, `csv.download.by_user`）
 - `target_table`: `orders`
 - `target_id`: `null`（集計操作のため）
-- `details`: 詳細情報（JSONB形式）
-- `ip_address`: 実行元IPアドレス
+- `details`: 詳細情報（JSONB 形式）
+- `ip_address`: 実行元 IP アドレス
 
 #### 修正ファイル
 
@@ -2113,28 +2307,28 @@
 
 #### 確認事項
 
-- ✅ PDF生成時に監査ログが記録される
-- ✅ CSV出力（明細）時に監査ログが記録される
-- ✅ CSV出力（ユーザー別合計）時に監査ログが記録される
+- ✅ PDF 生成時に監査ログが記録される
+- ✅ CSV 出力（明細）時に監査ログが記録される
+- ✅ CSV 出力（ユーザー別合計）時に監査ログが記録される
 - ✅ 操作ログ閲覧画面（`/admin/logs`）で確認可能
 
 ---
 
-## 2025-01-XX（PDF生成時の監査ログ記録機能の修正）
+## 2025-01-XX（PDF 生成時の監査ログ記録機能の修正）
 
 ### 問題
 
-- PDF生成時に監査ログが記録されない
+- PDF 生成時に監査ログが記録されない
 - エラー: `TypeError: headers is not a function`
 
 ### 原因
 
 - `headers()`関数の呼び出し方法が誤っていた
-- Next.js 16では`request.headers`から直接取得する必要がある
+- Next.js 16 では`request.headers`から直接取得する必要がある
 
 ### 解決策
 
-- `request.headers`から直接IPアドレスを取得する方法に変更
+- `request.headers`から直接 IP アドレスを取得する方法に変更
 - `doc.on('end')`の重複を削除
 
 ### 修正ファイル
@@ -2143,7 +2337,7 @@
 
 ### 確認事項
 
-- ✅ PDF生成時に監査ログが正しく記録される
+- ✅ PDF 生成時に監査ログが正しく記録される
 - ✅ 操作ログ閲覧画面（`/admin/logs`）で確認可能
 
 ---
@@ -2155,11 +2349,13 @@
 社員のみが新規登録できるようにする制限機能を実装しました。
 
 1. **招待コード方式**
-   - 4桁の数字の招待コードを必須にする
-   - 使用回数制限機能（1〜9999回、または無制限）
+
+   - 4 桁の数字の招待コードを必須にする
+   - 使用回数制限機能（1〜9999 回、または無制限）
    - 招待コード変更時に使用回数を自動リセット
 
 2. **社員コードマスター方式**
+
    - 事前に登録された社員コードのみ新規登録可能
    - 登録済みフラグで二重登録を防止
    - 管理者画面で社員コードマスターを管理可能
@@ -2179,9 +2375,9 @@
 - `app/admin/invitation-code/page.tsx`: 招待コード管理専用ページ（新規作成）
 - `app/admin/employee-codes/page.tsx`: 社員コードマスター管理画面（新規作成）
 - `app/api/auth/signup/route.ts`: 招待コードと社員コードマスターのチェックを実装
-- `app/api/admin/invitation-code/route.ts`: 招待コード管理API（新規作成）
-- `app/api/admin/employee-codes/route.ts`: 社員コードマスター管理API（新規作成）
-- `app/api/admin/employee-codes/[id]/route.ts`: 社員コードマスター管理API（個別）（新規作成）
+- `app/api/admin/invitation-code/route.ts`: 招待コード管理 API（新規作成）
+- `app/api/admin/employee-codes/route.ts`: 社員コードマスター管理 API（新規作成）
+- `app/api/admin/employee-codes/[id]/route.ts`: 社員コードマスター管理 API（個別）（新規作成）
 - `app/admin/settings/page.tsx`: 招待コード設定を削除
 - `app/api/admin/settings/route.ts`: 招待コード関連の処理を削除
 - `components/admin-nav.tsx`: 「招待コード管理」「社員コードマスター」メニューを追加
@@ -2189,10 +2385,12 @@
 ### 機能詳細
 
 1. **招待コードのチェック**
+
    - システム設定で設定した招待コードと一致する場合のみ登録可能
    - 使用回数が上限に達している場合は登録不可
 
 2. **社員コードマスターのチェック**
+
    - マスターテーブルに存在し、未登録の社員コードのみ登録可能
    - 既に登録済みの社員コードは登録不可
 
@@ -2202,7 +2400,7 @@
 
 ### 確認事項
 
-- ✅ 招待コードが4桁の数字で生成される
+- ✅ 招待コードが 4 桁の数字で生成される
 - ✅ 使用回数制限が正しく機能する
 - ✅ 社員コードマスターのチェックが正しく機能する
 - ✅ 登録済みの社員コードは編集・削除不可
@@ -2227,7 +2425,7 @@
 
 #### 技術的な詳細
 
-- `app/api/admin/users/[id]/route.ts`のPUTメソッドを修正
+- `app/api/admin/users/[id]/route.ts`の PUT メソッドを修正
 - 社員コード変更時に`employee_codes`テーブルを更新
 - 変更前の社員コードを取得して、変更時に解放処理を実行
 - 新しい社員コードが`employee_codes`テーブルに存在する場合、未登録のみ許可
@@ -2235,7 +2433,7 @@
 #### 注意事項
 
 - 社員コード変更時、過去の注文データは`user_id`で参照しているため整合性は保たれる
-- CSV/PDF出力では、その時点の`profiles`テーブルの社員コードが表示される（過去の注文でも現在の社員コードが表示される）
+- CSV/PDF 出力では、その時点の`profiles`テーブルの社員コードが表示される（過去の注文でも現在の社員コードが表示される）
 - 監査ログには変更前後の社員コードが記録される
 
 ### 新規登録方式の変更
@@ -2264,24 +2462,27 @@
 
 #### 実装詳細
 
-1. **承認待ちユーザー一覧取得API** (`GET /api/admin/users/pending`)
+1. **承認待ちユーザー一覧取得 API** (`GET /api/admin/users/pending`)
+
    - `is_active = false`のユーザー一覧を取得
    - 登録日時順（新しい順）で表示
 
-2. **ユーザー承認API** (`POST /api/admin/users/[id]/approve`)
+2. **ユーザー承認 API** (`POST /api/admin/users/[id]/approve`)
+
    - 承認待ちユーザーを承認（`is_active = true`に設定）
    - 社員コードの重複チェックを実行
    - 監査ログに記録（`user.approve`アクション）
 
-3. **承認待ちユーザー削除API** (`POST /api/admin/users/[id]/reject`)
+3. **承認待ちユーザー削除 API** (`POST /api/admin/users/[id]/reject`)
+
    - 承認待ちユーザーを物理削除
    - 削除前に、関連する注文、自動注文設定、自動注文テンプレートを削除
    - `employee_codes`テーブルで社員コードを解放
-   - Supabase Authのユーザーを削除
+   - Supabase Auth のユーザーを削除
    - `profiles`テーブルのレコードを削除
    - 監査ログに記録（`user.reject`アクション）
 
-4. **UI実装**
+4. **UI 実装**
    - ユーザー管理画面に「承認待ち」タブを追加
    - 承認待ちユーザー一覧を表示（社員コード、氏名、メール、登録日時）
    - 「承認」「編集」「削除」ボタンを表示
@@ -2296,9 +2497,9 @@
 
 - `app/api/admin/users/[id]/route.ts`: 社員コード変更機能の実装
 - `app/api/auth/signup/route.ts`: 新規登録方式の変更
-- `app/api/admin/users/pending/route.ts`: 承認待ちユーザー一覧取得API（新規作成）
-- `app/api/admin/users/[id]/approve/route.ts`: ユーザー承認API（新規作成）
-- `app/api/admin/users/[id]/reject/route.ts`: 承認待ちユーザー削除API（新規作成）
+- `app/api/admin/users/pending/route.ts`: 承認待ちユーザー一覧取得 API（新規作成）
+- `app/api/admin/users/[id]/approve/route.ts`: ユーザー承認 API（新規作成）
+- `app/api/admin/users/[id]/reject/route.ts`: 承認待ちユーザー削除 API（新規作成）
 - `app/admin/users/page.tsx`: 承認待ちユーザー一覧画面の追加
 - `app/admin/page.tsx`: ダッシュボードに承認待ちユーザー数を表示
 - `app/(auth)/login/page.tsx`: ログイン時の承認待ちチェック
@@ -2321,18 +2522,19 @@
 
 #### 問題
 
-- 承認待ちユーザーが1名いるのに、ダッシュボードの承認待ちが0人と表示される
+- 承認待ちユーザーが 1 名いるのに、ダッシュボードの承認待ちが 0 人と表示される
 - 承認後、アクティブユーザーが増加せず、承認前と同じ人数のまま
 
 #### 原因
 
-- ダッシュボードで通常のSupabaseクライアント（`createClient()`）を使用していたため、RLSポリシーの影響で全ユーザーを取得できなかった
+- ダッシュボードで通常の Supabase クライアント（`createClient()`）を使用していたため、RLS ポリシーの影響で全ユーザーを取得できなかった
 - 承認待ちユーザーの条件が不適切（`is_active = false`のみで、退職者も含まれていた）
 
 #### 解決策
 
-1. **Service Role Keyの使用**
-   - ダッシュボードで`supabaseAdmin`（Service Role Key）を使用してRLSをバイパス
+1. **Service Role Key の使用**
+
+   - ダッシュボードで`supabaseAdmin`（Service Role Key）を使用して RLS をバイパス
    - アクティブユーザー数と承認待ちユーザー数を正しく取得
 
 2. **承認待ちユーザー数の条件修正**
@@ -2341,7 +2543,7 @@
 
 #### 修正ファイル
 
-- `app/admin/page.tsx`: Service Role Keyを使用、承認待ちユーザー数の条件を修正
+- `app/admin/page.tsx`: Service Role Key を使用、承認待ちユーザー数の条件を修正
 - `app/api/admin/users/pending/route.ts`: 承認待ちユーザーの条件を修正
 
 #### 確認事項
@@ -2353,14 +2555,16 @@
 
 #### 実装内容
 
-ユーザー管理画面を「有効なユーザー」「無効なユーザー」「承認待ち」の3つのタブに分割。
+ユーザー管理画面を「有効なユーザー」「無効なユーザー」「承認待ち」の 3 つのタブに分割。
 
 1. **有効なユーザータブ**
+
    - `is_active = true`のユーザーのみ表示
    - 通常の操作（編集、カレンダー、削除）が可能
    - 「状態」列を削除（すべて有効のため）
 
 2. **無効なユーザータブ**
+
    - `is_active = false`かつ退職日が設定されているユーザー（退職者を含む）
    - グレーアウト表示（`opacity-75`）
    - 編集のみ可能（カレンダーや削除ボタンは非表示）
@@ -2369,7 +2573,7 @@
    - `is_active = false`かつ退職日が未設定または未来のユーザー
    - 承認・編集・削除（拒否）が可能
 
-#### UI改善
+#### UI 改善
 
 - 各タブにユーザー数を表示（例: 「有効なユーザー (10)」）
 - 無効なユーザーの行をグレーアウト表示して視認性を向上
@@ -2377,7 +2581,7 @@
 
 #### 修正ファイル
 
-- `app/admin/users/page.tsx`: タブ切り替え機能を3つに分割、表示ロジックを改善
+- `app/admin/users/page.tsx`: タブ切り替え機能を 3 つに分割、表示ロジックを改善
 
 #### 確認事項
 
@@ -2391,23 +2595,27 @@
 ### 問題の確認と解決
 
 #### 問題
+
 - 既に注文があるユーザーを削除した場合、それまでに注文したデータが消えて、お弁当代をいくら徴収すればいいかわからなくなる可能性がある
 
 #### 現状確認
+
 - 既存の実装では、既存ユーザーの削除は論理削除（`is_active = false`）のみで、物理削除は行っていない
 - したがって、注文データは保持されており、会計・集計に問題はない
 
 #### 追加の保護機能
 
 1. **外部キー制約の確認・修正マイグレーション**
+
    - `061_check_orders_user_id_fk_constraint.sql`: 現在の外部キー制約を確認
    - `062_fix_orders_user_id_fk_to_restrict.sql`: `ON DELETE RESTRICT`に変更（データ保護のため）
    - `orders.user_id`が`profiles.id`を参照する際、`ON DELETE RESTRICT`により物理削除を防止
 
-2. **ユーザー削除APIの改善**
+2. **ユーザー削除 API の改善**
+
    - 削除時に注文データの存在をチェック
    - 注文データがある場合、警告ログを出力
-   - APIのコメントを更新し、論理削除のみであることを明確化
+   - API のコメントを更新し、論理削除のみであることを明確化
 
 3. **ドキュメントの追加**
    - `docs/ユーザー削除と注文データ保護.md`: ユーザー削除と注文データ保護の仕組みを説明
@@ -2415,8 +2623,8 @@
 #### 修正ファイル
 
 - `app/api/admin/users/[id]/route.ts`: 注文データチェックと警告ログを追加
-- `supabase/migrations/061_check_orders_user_id_fk_constraint.sql`: 外部キー制約確認用SQL（新規作成）
-- `supabase/migrations/062_fix_orders_user_id_fk_to_restrict.sql`: 外部キー制約修正用SQL（新規作成）
+- `supabase/migrations/061_check_orders_user_id_fk_constraint.sql`: 外部キー制約確認用 SQL（新規作成）
+- `supabase/migrations/062_fix_orders_user_id_fk_to_restrict.sql`: 外部キー制約修正用 SQL（新規作成）
 - `docs/ユーザー削除と注文データ保護.md`: ドキュメント（新規作成）
 
 #### 確認事項
@@ -2438,11 +2646,13 @@
 
 ### 原因
 
-1. **削除APIが`left_date`を設定していなかった**
+1. **削除 API が`left_date`を設定していなかった**
+
    - 削除時に`is_active = false`のみ設定し、`left_date`を設定していなかった
    - そのため、削除されたユーザーが承認待ち条件（`is_active = false` かつ `left_date`が未設定または未来）に一致していた
 
-2. **承認待ちAPIの条件が不適切**
+2. **承認待ち API の条件が不適切**
+
    - 承認待ち条件が`left_date >= 今日`（以上）だったため、今日の日付も含まれていた
    - 削除時に今日の日付を設定しても、承認待ちリストに含まれてしまっていた
 
@@ -2451,11 +2661,13 @@
 
 ### 解決策
 
-1. **削除APIで`left_date`を今日の日付に設定**
+1. **削除 API で`left_date`を今日の日付に設定**
+
    - 削除時に`is_active = false`と`left_date = 今日の日付`を同時に設定
    - これにより、削除されたユーザーは無効なユーザーリストに表示される
 
-2. **承認待ちAPIの条件を修正**
+2. **承認待ち API の条件を修正**
+
    - 条件を`left_date >= 明日`（より大きい）に変更
    - 今日の日付は承認待ちリストから除外される
 
@@ -2492,7 +2704,7 @@
 
 #### 判断
 
-- 社員コードマスターは社員コード変更機能で内部的に使用されているため、テーブルとAPIは維持
+- 社員コードマスターは社員コード変更機能で内部的に使用されているため、テーブルと API は維持
 - ただし、管理者が手動でマスターを管理する必要性は低い（自動更新されるため）
 
 ### 管理者メニューからの社員コードマスター項目の削除
@@ -2500,12 +2712,12 @@
 #### 実装内容
 
 - 管理者メニュー（`components/admin-nav.tsx`）から「社員コードマスター」メニュー項目を削除
-- 管理画面やAPIは残す（社員コード変更機能で内部的に使用されるため）
-- 直接URL（`/admin/employee-codes`）でアクセスすることは可能
+- 管理画面や API は残す（社員コード変更機能で内部的に使用されるため）
+- 直接 URL（`/admin/employee-codes`）でアクセスすることは可能
 
 #### 修正ファイル
 
-- `components/admin-nav.tsx`: 「社員コードマスター」メニュー項目を削除（35行目）
+- `components/admin-nav.tsx`: 「社員コードマスター」メニュー項目を削除（35 行目）
 
 ### 注文の締切時刻チェック動作の確認
 
@@ -2516,28 +2728,30 @@
 #### 確認結果
 
 1. **注文作成（POST /api/orders）**
+
    - 締切時刻を過ぎている場合: 「締切時刻を過ぎています」というエラーが返され、注文は作成されない
-   - チェックは注文確定ボタンを押した時点（API呼び出し時点）で実行される
+   - チェックは注文確定ボタンを押した時点（API 呼び出し時点）で実行される
 
 2. **注文変更（PUT /api/orders/[id]）**
+
    - 締切時刻を過ぎている場合: 「締切時刻を過ぎているため、注文を変更できません」というエラーが返される
-   - チェックは変更確定ボタンを押した時点（API呼び出し時点）で実行される
+   - チェックは変更確定ボタンを押した時点（API 呼び出し時点）で実行される
 
 3. **注文キャンセル（PATCH /api/orders/[id]）**
    - 締切時刻を過ぎている場合: 「最終の確定処理で時間を過ぎているためキャンセルできません」というエラーが返される
-   - チェックはキャンセルボタンを押した時点（API呼び出し時点）で実行される
+   - チェックはキャンセルボタンを押した時点（API 呼び出し時点）で実行される
 
 #### 重要なポイント
 
-- すべての処理で、締切時刻のチェックは処理実行時点（API呼び出し時点）で行われる
+- すべての処理で、締切時刻のチェックは処理実行時点（API 呼び出し時点）で行われる
 - 画面を開いた時点ではなく、確定・変更・キャンセルボタンを押した時点で判定される
 - サーバー側の現在時刻（`new Date()`）を使用するため、クライアント側の時刻改ざんの影響を受けない
 - 作業中に締切時刻を過ぎても、確定処理の時点でチェックされるため、締切時刻を過ぎた操作は実行されない
 
 #### 確認ファイル
 
-- `app/api/orders/route.ts`: 注文作成時の締切時刻チェック（177-191行目）
-- `app/api/orders/[id]/route.ts`: 注文変更時の締切時刻チェック（131-149行目）、注文キャンセル時の締切時刻チェック（387-422行目）
+- `app/api/orders/route.ts`: 注文作成時の締切時刻チェック（177-191 行目）
+- `app/api/orders/[id]/route.ts`: 注文変更時の締切時刻チェック（131-149 行目）、注文キャンセル時の締切時刻チェック（387-422 行目）
 
 ---
 
@@ -2548,23 +2762,26 @@
 #### 実装内容
 
 - `.env.local`ファイルの作成手順をステップバイステップで詳細化
-- Supabase Dashboardからの値取得手順を追加
+- Supabase Dashboard からの値取得手順を追加
 - 環境変数の確認方法を追加
 - 使用されている環境変数の完全なリストを追加
 
 #### 追加内容
 
 1. **`.env.local`ファイルの作成手順**
-   - PowerShellでのコピー方法
+
+   - PowerShell でのコピー方法
    - 手動での作成方法
    - ファイルの保存方法
 
-2. **Supabaseの値取得手順**
-   - Supabase Dashboardへのアクセス方法
-   - Project Settings > APIからの値取得方法
+2. **Supabase の値取得手順**
+
+   - Supabase Dashboard へのアクセス方法
+   - Project Settings > API からの値取得方法
    - 各環境変数の取得箇所の明示
 
 3. **環境変数の設定方法**
+
    - 実際の値の設定例
    - プレースホルダー値の置き換え方法
    - コメント行の説明
@@ -2590,7 +2807,7 @@
 #### 確認事項
 
 - ✅ `.env.local`ファイルの作成手順が詳細に記載されている
-- ✅ Supabase Dashboardからの値取得手順が記載されている
+- ✅ Supabase Dashboard からの値取得手順が記載されている
 - ✅ 使用されている環境変数の完全なリストが記載されている
 - ✅ ログインできない場合のトラブルシューティングが追加されている
 
@@ -2601,49 +2818,60 @@
 ### 環境変数設定に関する説明の追加
 
 #### 問題
+
 - ログイン時に「Failed to fetch」エラーが発生
 - エラーメッセージ: `net::ERR_NAME_NOT_RESOLVED`（`https://your-project-id.supabase.co`にアクセスしようとしている）
 
 #### 原因
+
 - `.env.local`ファイルにプレースホルダー値（`your-project-id.supabase.co`、`your-anon-key`）が残っていた
 - 環境変数が正しく設定されていなかった
 
 #### 解決策
+
 1. **環境変数の設定手順の確認**
+
    - Supabase Dashboard > Project Settings > API から値を取得
    - `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`を設定
    - 開発サーバーを再起動（`.env.local`を変更した後は必須）
 
 2. **`AUTO_ORDER_SECRET`の設定方法の説明**
-   - 文字数に制限はない（推奨は64文字程度）
+
+   - 文字数に制限はない（推奨は 64 文字程度）
    - 開発環境なら簡単な文字列でも可（例: `dev-secret-key-12345`）
    - 本番環境では推測されにくいランダムな文字列を推奨
 
-3. **PDF生成関連の環境変数について**
-   - PDF生成関連の環境変数（`PDF_SENDER_*`）は**オプション**（不要）
+3. **PDF 生成関連の環境変数について**
+   - PDF 生成関連の環境変数（`PDF_SENDER_*`）は**オプション**（不要）
    - システム設定画面（`/admin/settings`）から会社情報を設定することを推奨
    - 環境変数は、システム設定に値がない場合のフォールバックとして使用される
 
 #### 修正ファイル
+
 - `docs/環境変数設定手順.md`: 既存のドキュメントを確認（詳細な手順が記載済み）
 
 ### デバッグログの削除
 
 #### 問題
+
 - ログイン後、カレンダーページでログが流れ続け、画面がちらつき操作ができない
 
 #### 原因
+
 - デバッグ用の`console.log`が複数のファイルに残っていた
 - 特に`app/(user)/calendar/page.tsx`で頻繁にログが出力されていた
 
 #### 解決策
+
 以下のファイルからデバッグログを削除：
 
 1. **`lib/supabase/client.ts`**
+
    - `createClient`関数内のデバッグログを削除
    - 環境変数のチェックログを削除
 
 2. **`app/(auth)/login/page.tsx`**
+
    - `handleLogin`関数内のデバッグログを削除
    - 環境変数チェック、`signInWithPassword`呼び出し前後のログを削除
 
@@ -2653,11 +2881,13 @@
    - メニューアイテム取得に関する警告ログを削除
 
 #### 修正ファイル
+
 - `lib/supabase/client.ts`: デバッグログを削除
 - `app/(auth)/login/page.tsx`: デバッグログを削除
 - `app/(user)/calendar/page.tsx`: デバッグログを削除
 
 #### 確認事項
+
 - ✅ ログインが正常に動作する
 - ✅ カレンダーページでログが流れない
 - ✅ 画面のちらつきが解消される
@@ -2675,7 +2905,7 @@
 
 ### 原因
 
-- 注文関連のコンポーネントとAPIに多数の`console.log`と`console.error`が残っていた
+- 注文関連のコンポーネントと API に多数の`console.log`と`console.error`が残っていた
 - 開発時のデバッグログが本番環境でも出力されていた
 
 ### 解決策
@@ -2685,6 +2915,7 @@
 #### 修正ファイル
 
 1. **`components/order-form.tsx`**
+
    - `console.log('Submitting order:', ...)` を削除
    - `console.log('Response status:', ...)` を削除
    - `console.log('Response data:', ...)` を削除
@@ -2692,10 +2923,12 @@
    - `console.error('Order error:', ...)` を削除
 
 2. **`app/(user)/orders/new/page.tsx`**
+
    - `console.error('Vendors fetch error:', ...)` を削除
    - `console.error('Menu items fetch error:', ...)` を削除
 
-3. **`app/api/orders/route.ts`（注文作成API）**
+3. **`app/api/orders/route.ts`（注文作成 API）**
+
    - `console.log('Fetching price for menu_id:', ...)` を削除
    - `console.log('Price fetch result:', ...)` を削除
    - `console.error('Price fetch error details:', ...)` を削除
@@ -2710,7 +2943,8 @@
    - `console.error('RPC call error:', ...)` を削除
    - `console.error('Order API error:', ...)` を削除
 
-4. **`app/api/orders/[id]/route.ts`（注文更新・キャンセルAPI）**
+4. **`app/api/orders/[id]/route.ts`（注文更新・キャンセル API）**
+
    - `console.log('=== Cancel Order Request ===')` を削除
    - `console.log('Raw params:', ...)` を削除
    - `console.log('Parsed orderId:', ...)` を削除
@@ -2719,16 +2953,18 @@
    - `console.log('Update result:', ...)` を削除
    - `console.error('Order cancel error:', ...)` を削除
    - `console.error('Error details:', ...)` を削除
-   - `console.error('Audit log insert error:', ...)` を削除（2箇所）
+   - `console.error('Audit log insert error:', ...)` を削除（2 箇所）
    - `console.error('Order cancel API error:', ...)` を削除
    - `console.error('Error stack:', ...)` を削除
    - `console.error('Order update error:', ...)` を削除
    - `console.error('Order update API error:', ...)` を削除
 
 5. **`components/cancel-order-button.tsx`**
+
    - `console.error('Cancel error:', ...)` を削除
 
 6. **`components/order-edit-form.tsx`**
+
    - `console.error('Order update error:', ...)` を削除
    - `console.error('Cancel order error:', ...)` を削除
    - `console.error('Order cancel error:', ...)` を削除
@@ -2765,10 +3001,12 @@
 #### 解決策
 
 1. **`lib/supabase/server.ts`からデバッグログを削除**
+
    - 以前のデバッグセッションで追加されたログを削除
    - `createClient()`が呼ばれるたびにログが出力されないように修正
 
 2. **`router.refresh()`の削除**
+
    - `components/order-form.tsx`から`router.refresh()`を削除
    - `router.push()`で自動的にリフレッシュされるため不要
 
@@ -2842,15 +3080,15 @@
 
 #### 実装内容
 
-- **Jest + React Testing Libraryのセットアップ**
-  - JestとReact Testing Libraryをインストール
+- **Jest + React Testing Library のセットアップ**
+  - Jest と React Testing Library をインストール
   - `jest.config.mjs`と`jest.setup.mjs`を作成
   - `package.json`にテストスクリプトを追加（`test`, `test:watch`, `test:coverage`）
 
 #### 実装ファイル
 
-- `jest.config.mjs`: Jest設定ファイル
-- `jest.setup.mjs`: Jestセットアップファイル（環境変数のモック、Next.jsのモック）
+- `jest.config.mjs`: Jest 設定ファイル
+- `jest.setup.mjs`: Jest セットアップファイル（環境変数のモック、Next.js のモック）
 - `package.json`: テストスクリプトの追加
 
 ### エラーハンドリングの統一
@@ -2858,13 +3096,14 @@
 #### 実装内容
 
 1. **エラーハンドリング用ユーティリティ関数の作成**
+
    - `lib/utils/errors.ts`: エラーハンドリング用ユーティリティ関数
      - `ApiError`クラス: カスタムエラークラス
      - 各種エラーレスポンス生成関数（`unauthorizedResponse`, `forbiddenResponse`, `notFoundResponse`, `validationErrorResponse`, `internalErrorResponse`）
      - `createErrorResponse`: エラーレスポンス生成ヘルパー関数
 
-2. **API Route用ヘルパー関数の作成**
-   - `lib/utils/api-helpers.ts`: API Route用ヘルパー関数
+2. **API Route 用ヘルパー関数の作成**
+   - `lib/utils/api-helpers.ts`: API Route 用ヘルパー関数
      - `getAuthenticatedUser`: 認証済みユーザー取得
      - `checkAdminPermission`: 管理者権限チェック
      - `requireAdmin`: 管理者権限必須チェック
@@ -2876,14 +3115,14 @@
 #### 実装ファイル
 
 - `lib/utils/errors.ts`: エラーハンドリングユーティリティ関数（新規作成）
-- `lib/utils/api-helpers.ts`: API Route用ヘルパー関数（新規作成）
+- `lib/utils/api-helpers.ts`: API Route 用ヘルパー関数（新規作成）
 
 ### 型定義の整理
 
 #### 実装内容
 
 - `lib/utils/types.ts`: 共通型定義
-  - `ApiResponse`: APIレスポンスの基本型
+  - `ApiResponse`: API レスポンスの基本型
   - `PaginationParams`, `PaginationResponse`: ページネーション型
   - `DateRange`: 日付範囲型
   - `SortOption`: ソートオプション型
@@ -2900,7 +3139,7 @@
 - `lib/utils/api-helpers.test.ts`: バリデーション関数のテスト
   - `validateDateNotPast`のテスト（未来の日付、今日の日付、過去の日付）
   - `validateQuantity`のテスト（正の整数、0、負の数、小数）
-  - テスト結果: 9件すべて通過
+  - テスト結果: 9 件すべて通過
 
 #### 実装ファイル
 
@@ -2911,9 +3150,10 @@
 #### 実装内容
 
 - `docs/TESTING.md`: テストガイド
+
   - テスト環境の説明
   - テストの実行方法
-  - テストの種類（ユニットテスト、コンポーネントテスト、API Routeテスト）
+  - テストの種類（ユニットテスト、コンポーネントテスト、API Route テスト）
   - テストカバレッジの目標
   - テストファイルの配置
   - ベストプラクティス
@@ -2929,7 +3169,7 @@
 - `docs/TESTING.md`: テストガイド（新規作成）
 - `README_TESTING.md`: テスト実行ガイド（新規作成）
 
-### .gitignoreの更新
+### .gitignore の更新
 
 - `.gitignore`に`.cursor/`ディレクトリを追加（デバッグログを除外）
 
@@ -2939,64 +3179,65 @@
 
 ### 確認事項
 
-- ✅ JestとReact Testing Libraryが正常に動作する
-- ✅ バリデーション関数のテストが9件すべて通過
+- ✅ Jest と React Testing Library が正常に動作する
+- ✅ バリデーション関数のテストが 9 件すべて通過
 - ✅ エラーハンドリングユーティリティ関数が作成された
 - ✅ 型定義が整理された
 - ✅ テストドキュメントが追加された
 
 ### 今後の課題
 
-- API Routeの統合テストの実装（モックを使用）
+- API Route の統合テストの実装（モックを使用）
 - コンポーネントテストの追加
-- E2Eテストのセットアップ（PlaywrightまたはCypress）
-- エラーハンドリングユーティリティを既存API Routeに適用
+- E2E テストのセットアップ（Playwright または Cypress）
+- エラーハンドリングユーティリティを既存 API Route に適用
 
 ---
 
-## 2026-01-02（Vercel Cron Jobs制限対応：Cron Jobsの統合）
+## 2026-01-02（Vercel Cron Jobs 制限対応：Cron Jobs の統合）
 
 ### 問題
 
-- Vercelの無料プランでは、チームあたり最大2つのCron Jobsしか作成できない
-- 既に他のプロジェクトで2つのCron Jobsを使用していたため、このプロジェクトで2つのCron Jobsを作成しようとしてデプロイエラーが発生
+- Vercel の無料プランでは、チームあたり最大 2 つの Cron Jobs しか作成できない
+- 既に他のプロジェクトで 2 つの Cron Jobs を使用していたため、このプロジェクトで 2 つの Cron Jobs を作成しようとしてデプロイエラーが発生
 - エラーメッセージ: `Your plan allows your team to create up to 2 Cron Jobs. Your team currently has 2, and this project is attempting to create 2 more, exceeding your team's limit.`
 
 ### 解決策
 
-**2つのCron Jobsを1つに統合**
+**2 つの Cron Jobs を 1 つに統合**
 
-1. **退職済みユーザー無効化処理を自動注文実行APIに統合**
+1. **退職済みユーザー無効化処理を自動注文実行 API に統合**
+
    - 退職済みユーザーの無効化処理を`/api/auto-order/run`内で実行するように変更
    - 自動注文実行の前に退職済みユーザーを無効化
    - エラーが発生しても自動注文処理は続行（ログに記録）
 
-2. **`vercel.json`からCron Jobを削除**
-   - `/api/admin/users/deactivate-expired`のCron Job設定を削除
-   - `/api/auto-order/run`のCron Jobのみ残す（1つに統合）
+2. **`vercel.json`から Cron Job を削除**
+   - `/api/admin/users/deactivate-expired`の Cron Job 設定を削除
+   - `/api/auto-order/run`の Cron Job のみ残す（1 つに統合）
 
 ### 変更の影響
 
-- **退職済みユーザー無効化の実行タイミング**: 毎日0:00 JST → 毎日10:00 JST（自動注文実行時）
-- **実行頻度**: 1日1回（自動注文実行時）
-- **`/api/admin/users/deactivate-expired`**: APIは残しており、手動実行やテストで使用可能
+- **退職済みユーザー無効化の実行タイミング**: 毎日 0:00 JST → 毎日 10:00 JST（自動注文実行時）
+- **実行頻度**: 1 日 1 回（自動注文実行時）
+- **`/api/admin/users/deactivate-expired`**: API は残しており、手動実行やテストで使用可能
 
 ### 修正ファイル
 
 - `app/api/auto-order/run/route.ts`: 退職済みユーザー無効化処理を追加
-- `vercel.json`: Cron Job設定を1つに削減
+- `vercel.json`: Cron Job 設定を 1 つに削減
 
 ### 確認事項
 
-- ✅ VercelのCron Jobs制限を回避（1つのCron Jobのみ使用）
+- ✅ Vercel の Cron Jobs 制限を回避（1 つの Cron Job のみ使用）
 - ✅ 退職済みユーザー無効化処理が自動注文実行時に実行される
 - ✅ デプロイエラーが解消される
 
 ---
 
-## 2026-01-03（カレンダーUI改善とログイン機能改善）
+## 2026-01-03（カレンダー UI 改善とログイン機能改善）
 
-### カレンダー画面のUI改善
+### カレンダー画面の UI 改善
 
 #### 問題
 
@@ -3013,7 +3254,7 @@
 
 - `components/calendar-grid.tsx`: テキストを「変更可」に変更
 
-### ログイン画面のUI改善
+### ログイン画面の UI 改善
 
 #### ローディング表示の追加
 
@@ -3024,7 +3265,7 @@
 
 #### エラーメッセージの日本語化
 
-- Supabaseのエラーメッセージを日本語に変換する関数を追加
+- Supabase のエラーメッセージを日本語に変換する関数を追加
 - `"Invalid login credentials"` → `"メールアドレスまたはパスワードが正しくありません"`
 - ログイン機能とパスワードリセット機能のエラーメッセージを日本語化
 
@@ -3032,34 +3273,36 @@
 
 - `app/(auth)/login/page.tsx`: ローディング表示追加、エラーメッセージ日本語化関数の追加
 
-### メール確認URLの修正
+### メール確認 URL の修正
 
 #### 問題
 
-- 新規登録時のメール内の確認URLがローカルURLになってしまう
-- デプロイした環境でサインアップしてもローカルのURLが表示される
+- 新規登録時のメール内の確認 URL がローカル URL になってしまう
+- デプロイした環境でサインアップしてもローカルの URL が表示される
 
 #### 解決策
 
 1. **環境変数の追加**
+
    - `NEXT_PUBLIC_SITE_URL`環境変数を追加
    - 本番環境: `https://bento-order-app-blond.vercel.app`
    - 開発環境: 設定不要（デフォルトで `http://localhost:3000` が使用される）
 
 2. **コードの修正**
-   - `app/api/auth/signup/route.ts`: 環境変数からURLを取得
+
+   - `app/api/auth/signup/route.ts`: 環境変数から URL を取得
    - `app/(auth)/login/page.tsx`: パスワードリセット機能でも環境変数を使用
 
-3. **Supabase Dashboardの設定**
-   - Authentication → URL Configuration → Site URL を本番環境のURLに設定
-   - Redirect URLs に本番環境のURLを追加
+3. **Supabase Dashboard の設定**
+   - Authentication → URL Configuration → Site URL を本番環境の URL に設定
+   - Redirect URLs に本番環境の URL を追加
 
 #### 修正ファイル
 
 - `app/api/auth/signup/route.ts`: `NEXT_PUBLIC_SITE_URL`環境変数の使用
 - `app/(auth)/login/page.tsx`: `NEXT_PUBLIC_SITE_URL`環境変数の使用
 - `env.example`: `NEXT_PUBLIC_SITE_URL`の説明を追加
-- `docs/環境変数設定手順.md`: Supabase Dashboardの設定手順を追加
+- `docs/環境変数設定手順.md`: Supabase Dashboard の設定手順を追加
 
 ### 確認事項
 
@@ -3068,22 +3311,23 @@
 - ✅ ログイン処理中にローディングスピナーが表示される
 - ✅ エラー時にログインボタンのテキストが「ログイン」に戻る
 - ✅ ログインエラーメッセージが日本語で表示される
-- ✅ メール内の確認URLが本番環境のURLになる
+- ✅ メール内の確認 URL が本番環境の URL になる
 
 ---
 
-## 2026-01-03（サインアップAPIのエラーメッセージ日本語化と自動注文処理の修正）
+## 2026-01-03（サインアップ API のエラーメッセージ日本語化と自動注文処理の修正）
 
-### サインアップAPIのエラーメッセージ日本語化
+### サインアップ API のエラーメッセージ日本語化
 
 #### 実装内容
 
 - **エラーメッセージ日本語化関数の追加**
+
   - `lib/utils/errors.ts`に`translateAuthError`関数を追加
-  - Supabase Authのエラーメッセージを日本語に変換する関数
+  - Supabase Auth のエラーメッセージを日本語に変換する関数
   - メールアドレス無効エラー（`Email address "xxx" is invalid`）に対応
 
-- **サインアップAPIでの日本語化**
+- **サインアップ API での日本語化**
   - `app/api/auth/signup/route.ts`で`translateAuthError`関数を使用
   - エラーレスポンスで日本語化したメッセージを返すように変更
 
@@ -3092,7 +3336,7 @@
 - `Email address "xxx" is invalid` → 「メールアドレスの形式が正しくありません。メールアドレスを確認してください」
 - `Invalid email` → 「メールアドレスの形式が正しくありません」
 - `Invalid login credentials` → 「メールアドレスまたはパスワードが正しくありません」
-- その他のSupabase Authエラーも日本語化
+- その他の Supabase Auth エラーも日本語化
 
 #### 修正ファイル
 
@@ -3114,7 +3358,7 @@
 #### 解決策
 
 - 登録成功後に`router.refresh()`を呼び出すように修正
-- Supabaseクライアントのセッション状態を更新するためにページをリフレッシュ
+- Supabase クライアントのセッション状態を更新するためにページをリフレッシュ
 
 #### 修正ファイル
 
@@ -3130,22 +3374,25 @@
 #### 問題
 
 - 締切時間を過ぎても、翌日の注文が入らなかった
-- Vercel Cron JobsのスケジュールがUTC基準で設定されていた
+- Vercel Cron Jobs のスケジュールが UTC 基準で設定されていた
 - 日付計算ロジックが不正確だった
 
 #### 解決策
 
-1. **Vercel Cron Jobsのスケジュール修正**
+1. **Vercel Cron Jobs のスケジュール修正**
+
    - `vercel.json`のスケジュールを`"0 10 * * *"`（UTC 10:00）から`"0 1 * * *"`（UTC 01:00）に変更
-   - JST 10:00に実行されるように修正（JST = UTC+9時間）
+   - JST 10:00 に実行されるように修正（JST = UTC+9 時間）
 
 2. **`.single()`のエラー修正**
+
    - `order_calendar`テーブルにレコードが存在しない場合、`.single()`がエラーを返す問題を修正
    - `.maybeSingle()`に変更して、レコードが存在しない場合もエラーを回避
 
 3. **日付計算ロジックの改善**
-   - JST時刻の日付計算を正確に行うように修正
-   - `Intl.DateTimeFormat`を使用して、JST時刻で正確に日付を計算
+
+   - JST 時刻の日付計算を正確に行うように修正
+   - `Intl.DateTimeFormat`を使用して、JST 時刻で正確に日付を計算
    - `toLocaleString`を使用していた不正確な方法から改善
 
 4. **未定義変数の修正**
@@ -3154,20 +3401,20 @@
 
 #### 修正ファイル
 
-- `vercel.json`: Cron JobsのスケジュールをUTC 01:00に変更
+- `vercel.json`: Cron Jobs のスケジュールを UTC 01:00 に変更
 - `app/api/auto-order/run/route.ts`: 日付計算ロジックの改善、`.maybeSingle()`の使用、未定義変数の修正
 
 #### 確認事項
 
-- ✅ 自動注文処理がJST 10:00に正しく実行される
+- ✅ 自動注文処理が JST 10:00 に正しく実行される
 - ✅ 翌営業日の注文が正しく作成される
-- ✅ 日付計算がJST基準で正確に行われる
+- ✅ 日付計算が JST 基準で正確に行われる
 
 ---
 
-## 2026-01-05（自動注文APIのデバッグログ追加とコード修正）
+## 2026-01-05（自動注文 API のデバッグログ追加とコード修正）
 
-### 自動注文APIのデバッグ機能強化
+### 自動注文 API のデバッグ機能強化
 
 #### 問題
 
@@ -3177,7 +3424,8 @@
 #### 解決策
 
 1. **デバッグログの追加**
-   - API呼び出し時の認証状態をログ出力（`isVercelCron`）
+
+   - API 呼び出し時の認証状態をログ出力（`isVercelCron`）
    - 今日の日付（JST）をログ出力
    - 対象日（翌営業日）をログ出力
    - 有効なユーザー数をログ出力
@@ -3185,7 +3433,7 @@
    - エラー発生時の詳細ログ（エラーメッセージ、スタックトレース）を出力
 
 2. **`.order()`メソッドの修正**
-   - `nullsFirst`オプションを削除（SupabaseのJavaScriptクライアントでの互換性の問題を回避）
+   - `nullsFirst`オプションを削除（Supabase の JavaScript クライアントでの互換性の問題を回避）
    - `.order('day_of_week', { ascending: true })`のみを使用
 
 #### 修正ファイル
@@ -3195,22 +3443,22 @@
 #### 確認事項
 
 - ✅ デバッグログが追加され、問題の特定が容易になった
-- ✅ Vercelのログで実行状況を確認できるようになった
+- ✅ Vercel のログで実行状況を確認できるようになった
 
-### Vercelの無料プランでのCron Jobs動作確認
+### Vercel の無料プランでの Cron Jobs 動作確認
 
 #### 確認内容
 
-- Vercelの無料プラン（Hobbyプラン）でもCron Jobsは利用可能
-- 制限: チームあたり最大2つのCron Jobs
-- 現在のプロジェクトでは1つのCron Jobのみ使用（制限内）
+- Vercel の無料プラン（Hobby プラン）でも Cron Jobs は利用可能
+- 制限: チームあたり最大 2 つの Cron Jobs
+- 現在のプロジェクトでは 1 つの Cron Job のみ使用（制限内）
 - クライアントからのトリガーなしでバックグラウンド実行が可能
 
 #### 注意事項
 
-- 商用利用は無料プランでは不可（Hobbyプランの利用規約に準拠）
-- 実行時間の制限あり（月間100時間）
-- Cron Jobsの数に制限あり（チームあたり最大2つ）
+- 商用利用は無料プランでは不可（Hobby プランの利用規約に準拠）
+- 実行時間の制限あり（月間 100 時間）
+- Cron Jobs の数に制限あり（チームあたり最大 2 つ）
 
 ---
 
@@ -3222,21 +3470,21 @@
 
 #### 過去の注文入力機能
 
-- **管理者モードのみ過去の日付に注文可能**: 注文作成APIで、管理者モード（`user_id`パラメータが指定されている場合）の場合は過去の日付チェックをスキップ
+- **管理者モードのみ過去の日付に注文可能**: 注文作成 API で、管理者モード（`user_id`パラメータが指定されている場合）の場合は過去の日付チェックをスキップ
 - **制限の緩和**: 管理者モードは最大注文可能日数の制限、注文可能日チェック、締切時刻チェックをスキップ
 - **一般ユーザーは従来どおり**: 一般ユーザーは従来どおりの制限を維持
 - **管理者がユーザー画面から開く場合**: 管理者でもユーザー画面からカレンダーを開く場合は通常の範囲での変更のみ許可
 
 #### 注文削除機能
 
-- **注文削除APIの追加**: `DELETE /api/orders/[id]` エンドポイントを追加（管理者のみ）
+- **注文削除 API の追加**: `DELETE /api/orders/[id]` エンドポイントを追加（管理者のみ）
 - **物理削除**: 注文を物理削除（`status = 'canceled'`への変更ではなく、レコード自体を削除）
 - **監査ログ記録**: 削除操作を監査ログに記録（`order.delete.admin`アクション）
 - **注文一覧画面に削除ボタン追加**: 管理者が注文一覧画面から直接削除可能
 
 #### 締切時刻を過ぎた注文のキャンセル制限
 
-- **一般ユーザーは締切時刻を過ぎた注文をキャンセル不可**: 注文履歴画面でキャンセルボタンを非表示、APIでもキャンセル不可
+- **一般ユーザーは締切時刻を過ぎた注文をキャンセル不可**: 注文履歴画面でキャンセルボタンを非表示、API でもキャンセル不可
 - **管理者は締切時刻を過ぎた注文もキャンセル可能**: 運用上の柔軟性のため
 
 #### 管理者モード判定ロジックの改善
@@ -3250,9 +3498,9 @@
 ### 修正ファイル
 
 - `app/api/orders/route.ts`: 管理者モードの場合は過去の日付チェック、最大注文可能日数チェック、注文可能日チェック、締切時刻チェックをスキップ
-- `app/api/orders/[id]/route.ts`: 
+- `app/api/orders/[id]/route.ts`:
   - 一般ユーザーの場合は締切時刻を過ぎた注文をキャンセル不可に修正
-  - DELETEメソッドを追加（管理者のみ、注文の物理削除）
+  - DELETE メソッドを追加（管理者のみ、注文の物理削除）
 - `app/(user)/orders/page.tsx`: `isAfterDeadline`関数を改善
 - `app/(user)/calendar/page.tsx`: 管理者モード判定ロジックを改善（`isAdminMode`を追加）
 - `app/(user)/orders/new/page.tsx`: 管理者モード判定ロジックを改善（`isAdminMode`を追加）
@@ -3272,74 +3520,75 @@
 
 ---
 
-## 2026-01-XX（UI改善、タイムゾーン問題修正、データベース接続最適化）
+## 2026-01-XX（UI 改善、タイムゾーン問題修正、データベース接続最適化）
 
 ### 実装内容
 
-UIの改善、タイムゾーン問題の修正、データベース接続の最適化を実施しました。
+UI の改善、タイムゾーン問題の修正、データベース接続の最適化を実施しました。
 
-#### UI改善
+#### UI 改善
 
 - **ログイン画面の年表記更新**: フッターの「© 2024 お弁当注文システム」を「© 2026 お弁当注文システム」に変更
 
 #### パスワードリセットメールのリンク問題修正
 
-- **問題**: パスワードリセットメールのリンクがローカルURL（`http://localhost:3000`）になってしまう
+- **問題**: パスワードリセットメールのリンクがローカル URL（`http://localhost:3000`）になってしまう
 - **原因**: `NEXT_PUBLIC_SITE_URL`環境変数が設定されていない場合、`window.location.origin`が使用されていた
-- **解決策**: 
+- **解決策**:
   - コードを改善し、`NEXT_PUBLIC_SITE_URL`が設定されていない場合の警告を追加
   - `env.example`に詳細な説明を追加
-  - VercelとSupabase Dashboardの両方で設定が必要であることを明記
+  - Vercel と Supabase Dashboard の両方で設定が必要であることを明記
 
 #### タイムゾーン問題の修正
 
 - **問題**: 本番環境（UTC）とローカル環境（JST）で、注文履歴画面の締切時刻判定が異なっていた
-- **原因**: `isAfterDeadline`関数で、UTCとJSTの混在による日付・時刻の比較が正しく行われていなかった
-- **解決策**: 
+- **原因**: `isAfterDeadline`関数で、UTC と JST の混在による日付・時刻の比較が正しく行われていなかった
+- **解決策**:
   - `app/(user)/orders/page.tsx`の`isAfterDeadline`関数を修正
   - JST（UTC+9）で統一して日付と時刻を比較するように変更
   - 本番環境とローカル環境で同じ動作になることを確認
 
 #### データベース接続の最適化
 
-- **DATABASE_URLユーティリティの追加**: 
+- **DATABASE_URL ユーティリティの追加**:
+
   - `lib/utils/database.ts`を作成
   - `getDatabaseUrl()`と`getDatabaseUrlOptional()`関数を追加
   - サーバーサイドでのみ使用可能な環境変数の安全な取得を実装
 
-- **Transaction connection (6543)のサポート追加**: 
+- **Transaction connection (6543)のサポート追加**:
   - `pg`ライブラリをインストール
-  - `lib/database/pool.ts`: 接続プールの管理（Transaction connection使用）
+  - `lib/database/pool.ts`: 接続プールの管理（Transaction connection 使用）
   - `lib/database/query.ts`: クエリヘルパー関数（`queryDatabase()`、`transaction()`）
   - `docs/Transaction接続の使用方法.md`: 使用方法の詳細ドキュメント
   - 接続プールを活用することで、パフォーマンスが向上（特に複数のクエリを実行する場合）
 
 ### 修正ファイル
 
-- `app/(auth)/login/page.tsx`: 
-  - 年表記を2026に更新
+- `app/(auth)/login/page.tsx`:
+  - 年表記を 2026 に更新
   - パスワードリセットメールのリンク生成ロジックを改善
-- `app/(user)/orders/page.tsx`: 
-  - `isAfterDeadline`関数を修正（JSTで統一）
-- `lib/utils/database.ts`: DATABASE_URL取得ユーティリティ（新規作成）
+- `app/(user)/orders/page.tsx`:
+  - `isAfterDeadline`関数を修正（JST で統一）
+- `lib/utils/database.ts`: DATABASE_URL 取得ユーティリティ（新規作成）
 - `lib/database/pool.ts`: 接続プール管理（新規作成）
 - `lib/database/query.ts`: クエリヘルパー関数（新規作成）
-- `env.example`: DATABASE_URLの説明を追加・更新
+- `env.example`: DATABASE_URL の説明を追加・更新
 - `package.json`: `pg`と`@types/pg`を追加
 
 ### 確認事項
 
-- ✅ ログイン画面の年表記が2026に更新されている
-- ✅ パスワードリセットメールのリンクが本番環境のURLになる（`NEXT_PUBLIC_SITE_URL`設定時）
+- ✅ ログイン画面の年表記が 2026 に更新されている
+- ✅ パスワードリセットメールのリンクが本番環境の URL になる（`NEXT_PUBLIC_SITE_URL`設定時）
 - ✅ 本番環境とローカル環境で、注文履歴画面の締切時刻判定が同じ動作になる
-- ✅ DATABASE_URLを安全に取得できる
+- ✅ DATABASE_URL を安全に取得できる
 - ✅ Transaction connection (6543)を使用したデータベース接続が可能
 
 ### 注意事項
 
-- **パスワードリセットメール**: VercelとSupabase Dashboardの両方で`NEXT_PUBLIC_SITE_URL`とSite URLを設定する必要があります
-- **タイムゾーン**: すべての日付・時刻比較はJST（UTC+9）で統一されています
-- **データベース接続**: Transaction connection (6543)はオプション機能です。既存のSupabaseクライアントと併用できます
+- **パスワードリセットメール**: Vercel と Supabase Dashboard の両方で`NEXT_PUBLIC_SITE_URL`と Site URL を設定する必要があります
+- **タイムゾーン**: すべての日付・時刻比較は JST（UTC+9）で統一されています
+- **データベース接続**: Transaction connection (6543)はオプション機能です。既存の Supabase クライアントと併用できます
 
 ---
 
