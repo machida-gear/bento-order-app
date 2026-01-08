@@ -40,6 +40,28 @@ export default function CalendarGrid({
   targetUserId,
   isAdminMode = false,
 }: CalendarGridProps) {
+  // デバッグ用: propsが正しく渡されているか確認（本番環境でも確認可能）
+  if (typeof window !== 'undefined') {
+    try {
+      const orderDaysMapKeys = orderDaysMap instanceof Map ? [] : Object.keys(orderDaysMap || {});
+      const ordersMapKeys = ordersMap instanceof Map ? [] : Object.keys(ordersMap || {});
+      console.log('[CalendarGrid] Props check:', {
+        year,
+        month,
+        orderDaysMapType: typeof orderDaysMap,
+        ordersMapType: typeof ordersMap,
+        orderDaysMapIsMap: orderDaysMap instanceof Map,
+        ordersMapIsMap: ordersMap instanceof Map,
+        orderDaysMapKeysCount: orderDaysMapKeys.length,
+        ordersMapKeysCount: ordersMapKeys.length,
+        orderDaysMapSample: orderDaysMapKeys.slice(0, 3),
+        ordersMapSample: ordersMapKeys.slice(0, 3),
+      });
+    } catch (error) {
+      console.error('[CalendarGrid] Error in props check:', error);
+    }
+  }
+  
   // 今日の日付と時刻（ローカルタイムゾーン）
   const today = new Date();
   const todayYear = today.getFullYear();
@@ -173,8 +195,29 @@ export default function CalendarGrid({
           }
 
           const dateStr = formatDateLocal(date);
-          const orderDay = orderDaysMap instanceof Map ? orderDaysMap.get(dateStr) : (orderDaysMap && typeof orderDaysMap === 'object' ? orderDaysMap[dateStr] : undefined);
-          const order = ordersMap instanceof Map ? ordersMap.get(dateStr) : (ordersMap && typeof ordersMap === 'object' ? ordersMap[dateStr] : undefined);
+          // オブジェクト型の場合の安全なアクセス
+          let orderDay: OrderDay | undefined;
+          let order: Order | undefined;
+          
+          try {
+            if (orderDaysMap instanceof Map) {
+              orderDay = orderDaysMap.get(dateStr);
+            } else if (orderDaysMap && typeof orderDaysMap === 'object' && !Array.isArray(orderDaysMap)) {
+              orderDay = (orderDaysMap as Record<string, OrderDay>)[dateStr];
+            }
+          } catch (error) {
+            console.error('Error accessing orderDaysMap:', error, { dateStr, orderDaysMapType: typeof orderDaysMap });
+          }
+          
+          try {
+            if (ordersMap instanceof Map) {
+              order = ordersMap.get(dateStr);
+            } else if (ordersMap && typeof ordersMap === 'object' && !Array.isArray(ordersMap)) {
+              order = (ordersMap as Record<string, Order>)[dateStr];
+            }
+          } catch (error) {
+            console.error('Error accessing ordersMap:', error, { dateStr, ordersMapType: typeof ordersMap });
+          }
           const isAvailable = orderDay?.is_available ?? false;
           const isTodayDay = isToday(date);
           const canOrderToday = canOrder(date, orderDay);
