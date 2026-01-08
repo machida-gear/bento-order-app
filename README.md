@@ -42,6 +42,7 @@ Next.js 16.1.1 (App Router) と Supabase を使用した社員向けお弁当注
 
 ### 最新の変更
 
+- **[カレンダーページHydration Mismatchエラー修正.md](./docs/カレンダーページHydration Mismatchエラー修正.md)** - カレンダーページのHydration Mismatchエラー修正（React error #418）
 - **[Next.js16型エラー修正とVercelデプロイ対応.md](./docs/Next.js16型エラー修正とVercelデプロイ対応.md)** - Next.js 16.1.1 の型エラー修正と Vercel デプロイ対応
 
 ---

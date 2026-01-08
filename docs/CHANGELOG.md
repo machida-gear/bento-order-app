@@ -6,6 +6,64 @@
 
 ---
 
+## 2026-01-XX（カレンダーページのHydration Mismatchエラー修正）
+
+### 問題
+
+- 注文カレンダーがローカル環境では正常に動作するが、デプロイした本番環境では正しく動かない
+- コンソールにReact error #418（hydration mismatch）エラーが発生
+- エラーメッセージ: `Uncaught Error: Minified React error #418`
+
+### 原因
+
+1. **サーバーとクライアントでの日付計算の不一致**: `CalendarGrid`コンポーネント内で`new Date()`を直接使用していたため、サーバー側（UTC）とクライアント側（ローカルタイムゾーン）で異なる日付が計算されていた
+2. **Hydration Mismatch**: サーバー側で生成されたHTMLとクライアント側で生成されたHTMLが一致せず、Reactのhydration処理でエラーが発生
+3. **タイムゾーンの違い**: サーバー側はUTC、クライアント側はJST（またはユーザーのローカルタイムゾーン）で実行されるため、`new Date()`の結果が異なる
+
+### 解決策
+
+#### 1. クライアント側でのみ日付を計算
+
+- `components/calendar-grid.tsx`: `useState`と`useEffect`を使用して、クライアント側でのみ`today`と`now`を計算するように変更
+- サーバー側レンダリング時は`null`を返し、クライアント側でマウント後に日付を設定
+
+#### 2. サーバー側レンダリング時のフォールバック
+
+- `isMounted`フラグを使用して、クライアント側でマウントされるまで空のカレンダーを表示
+- これにより、サーバーとクライアントで同じHTMLが生成され、hydration mismatchを防止
+
+#### 3. CalendarCellコンポーネントへのprops追加
+
+- `today`と`now`をpropsとして渡すように変更
+- `CalendarCell`内の`new Date()`呼び出しを削除し、propsから受け取るように変更
+
+#### 4. nullチェックの追加
+
+- `canOrder`関数内で`now`を使用する際のnullチェックを追加
+
+#### 修正ファイル
+
+- `components/calendar-grid.tsx`:
+  - `useState`と`useEffect`を使用してクライアント側でのみ日付を計算
+  - サーバー側レンダリング時のフォールバック処理を追加
+  - `CalendarCell`コンポーネントに`today`と`now`をpropsとして渡すように変更
+  - `CalendarCell`内の`new Date()`呼び出しを削除
+
+### 確認事項
+
+- ✅ カレンダーページが正常に表示される（ローカル環境・本番環境）
+- ✅ React error #418（hydration mismatch）エラーが解消される
+- ✅ サーバーとクライアントで同じHTMLが生成される
+- ✅ 日付計算がクライアント側のタイムゾーンで正しく実行される
+
+### 注意事項
+
+- **Hydration Mismatchの防止**: サーバーとクライアントで異なる結果を返す可能性がある処理（`new Date()`など）は、クライアント側でのみ実行する必要があります
+- **useEffectの使用**: クライアント側でのみ実行する処理は`useEffect`内で実行し、`isMounted`フラグで制御します
+- **フォールバックUI**: サーバー側レンダリング時は、クライアント側でマウントされるまで空の状態を表示することで、hydration mismatchを防止します
+
+---
+
 ## 2026-01-XX（カレンダーページのMap型シリアライズ問題とビルドエラー修正）
 
 ### 問題

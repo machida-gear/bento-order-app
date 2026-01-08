@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Database } from "@/lib/database.types";
 
@@ -40,34 +41,72 @@ export default function CalendarGrid({
   targetUserId,
   isAdminMode = false,
 }: CalendarGridProps) {
+  // クライアント側でのみ日付を計算（hydration mismatchを防ぐ）
+  const [today, setToday] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    // クライアント側でのみ実行
+    setIsMounted(true);
+    const currentDate = new Date();
+    setToday(currentDate);
+    setNow(new Date());
+  }, []);
+
   // デバッグ用: propsが正しく渡されているか確認（本番環境でも確認可能）
-  if (typeof window !== 'undefined') {
-    try {
-      const orderDaysMapKeys = orderDaysMap instanceof Map ? [] : Object.keys(orderDaysMap || {});
-      const ordersMapKeys = ordersMap instanceof Map ? [] : Object.keys(ordersMap || {});
-      console.log('[CalendarGrid] Props check:', {
-        year,
-        month,
-        orderDaysMapType: typeof orderDaysMap,
-        ordersMapType: typeof ordersMap,
-        orderDaysMapIsMap: orderDaysMap instanceof Map,
-        ordersMapIsMap: ordersMap instanceof Map,
-        orderDaysMapKeysCount: orderDaysMapKeys.length,
-        ordersMapKeysCount: ordersMapKeys.length,
-        orderDaysMapSample: orderDaysMapKeys.slice(0, 3),
-        ordersMapSample: ordersMapKeys.slice(0, 3),
-      });
-    } catch (error) {
-      console.error('[CalendarGrid] Error in props check:', error);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const orderDaysMapKeys = orderDaysMap instanceof Map ? [] : Object.keys(orderDaysMap || {});
+        const ordersMapKeys = ordersMap instanceof Map ? [] : Object.keys(ordersMap || {});
+        console.log('[CalendarGrid] Props check:', {
+          year,
+          month,
+          orderDaysMapType: typeof orderDaysMap,
+          ordersMapType: typeof ordersMap,
+          orderDaysMapIsMap: orderDaysMap instanceof Map,
+          ordersMapIsMap: ordersMap instanceof Map,
+          orderDaysMapKeysCount: orderDaysMapKeys.length,
+          ordersMapKeysCount: ordersMapKeys.length,
+          orderDaysMapSample: orderDaysMapKeys.slice(0, 3),
+          ordersMapSample: ordersMapKeys.slice(0, 3),
+        });
+      } catch (error) {
+        console.error('[CalendarGrid] Error in props check:', error);
+      }
     }
+  }, [year, month, orderDaysMap, ordersMap]);
+
+  // サーバー側レンダリング時は空の状態を返す（hydration mismatchを防ぐ）
+  if (!isMounted || !today || !now) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
+        <div className="grid grid-cols-7 gap-1 mb-1 sm:mb-1 md:mb-1">
+          {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
+            <div
+              key={day}
+              className="text-center text-xs sm:text-sm md:text-xs font-medium text-gray-600 py-1 sm:py-1.5 md:py-1"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1 auto-rows-fr md:gap-1.5 md:calendar-grid-desktop">
+          {Array.from({ length: 42 }).map((_, index) => (
+            <div
+              key={index}
+              className="border border-transparent rounded-lg min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
+            />
+          ))}
+        </div>
+      </div>
+    );
   }
-  
-  // 今日の日付と時刻（ローカルタイムゾーン）
-  const today = new Date();
+
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth();
   const todayDate = today.getDate();
-  const now = new Date();
 
   // ローカルタイムゾーンで日付文字列を取得（YYYY-MM-DD形式）
   const formatDateLocal = (date: Date): string => {
@@ -123,7 +162,7 @@ export default function CalendarGrid({
     if (daysAhead > maxOrderDaysAhead) return false;
 
     // 今日の場合、締切時刻をチェック
-    if (isToday(date) && orderDay.deadline_time) {
+    if (isToday(date) && orderDay.deadline_time && now) {
       const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
       const deadline = new Date(today);
       deadline.setHours(hours, minutes, 0, 0);
@@ -259,6 +298,8 @@ export default function CalendarGrid({
                 exceedsMaxDays={exceedsMaxDays}
                 targetUserId={targetUserId}
                 isAdminMode={isAdminMode}
+                today={today}
+                now={now}
               />
             </div>
           );
@@ -278,6 +319,8 @@ interface CalendarCellProps {
   exceedsMaxDays: boolean;
   targetUserId?: string;
   isAdminMode?: boolean;
+  today: Date;
+  now: Date;
 }
 
 function CalendarCell({
@@ -290,7 +333,9 @@ function CalendarCell({
   exceedsMaxDays,
   targetUserId,
   isAdminMode = false,
-}: CalendarCellProps) {
+  today,
+  now,
+}: CalendarCellProps & { today: Date; now: Date }) {
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
   // 注文済みの場合、締切時刻前かどうかをチェック
@@ -304,16 +349,15 @@ function CalendarCell({
 
     // 過去の日付は変更不可
     const orderDateObj = new Date(order.order_date + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (orderDateObj < today) return false;
+    const todayDate = new Date(today);
+    todayDate.setHours(0, 0, 0, 0);
+    if (orderDateObj < todayDate) return false;
 
     // 今日の場合、締切時刻をチェック
-    const isTodayDate = orderDateObj.getTime() === today.getTime();
+    const isTodayDate = orderDateObj.getTime() === todayDate.getTime();
     if (isTodayDate && orderDay.deadline_time) {
-      const now = new Date();
       const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
-      const deadline = new Date(today);
+      const deadline = new Date(todayDate);
       deadline.setHours(hours, minutes, 0, 0);
 
       if (now >= deadline) return false;

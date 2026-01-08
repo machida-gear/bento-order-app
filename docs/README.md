@@ -76,6 +76,7 @@
 | [招待コード使用回数リセット機能修正_型エラー修正.md](./招待コード使用回数リセット機能修正_型エラー修正.md) | 招待コードリセット機能修正とTypeScript型エラー修正            | CHANGELOG.md, 新規登録制限機能の実装.md |
 | [パスワードリセット機能の実装.md](./パスワードリセット機能の実装.md) | パスワードリセット機能の実装（メール内リンクからのパスワード更新、メールテンプレート設定方法含む） | CHANGELOG.md, PROGRESS.md, SPEC.md, 環境変数設定手順.md |
 | [カレンダーページMap型シリアライズ問題の解決.md](./カレンダーページMap型シリアライズ問題の解決.md) | カレンダーページのMap型シリアライズ問題とビルドエラーの解決（Next.js 16のprops渡し制限、useSearchParams Suspense要件含む） | CHANGELOG.md, PROGRESS.md, SPEC.md, DECISIONS.md |
+| [カレンダーページHydration Mismatchエラー修正.md](./カレンダーページHydration Mismatchエラー修正.md) | カレンダーページのHydration Mismatchエラー修正（React error #418、サーバー・クライアント間の日付計算の不一致解決） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 
 ### 運用・設定ドキュメント
 
@@ -193,4 +194,4 @@ docs/TODO.md
 
 ---
 
-最終更新日: 2026-01-XX（カレンダーページのMap型シリアライズ問題とビルドエラー修正、エラーハンドリング追加完了時点）
+最終更新日: 2026-01-XX（カレンダーページのHydration Mismatchエラー修正完了時点）
