@@ -6,6 +6,76 @@
 
 ---
 
+## 2026-01-XX（カレンダーページのMap型シリアライズ問題とビルドエラー修正）
+
+### 問題
+
+- カレンダーページが動かなくなってしまった
+- タップもできないし、注文可能日の注文ボタンも表示されない
+- 唯一表示月の表示のみ変更できる
+- ローカルでは動くが、デプロイした本番環境では動かない
+- ビルド時にTypeScript型エラーが発生
+- `useSearchParams()`がSuspenseバウンダリでラップされていないエラー
+
+### 原因
+
+1. **Map型のシリアライズ問題**: Next.jsでは、サーバーコンポーネントからクライアントコンポーネントに渡すpropsはシリアライズ可能である必要があります。`Map`型はシリアライズできないため、クライアントコンポーネントに正しく渡されていませんでした。
+2. **TypeScript型推論エラー**: `targetProfileResult.data`の型が正しく推論されず、`never`型として推論されていました。
+3. **useSearchParams Suspenseバウンダリ**: Next.js 16では、`useSearchParams()`を使用するコンポーネントは`Suspense`バウンダリでラップする必要があります。
+
+### 解決策
+
+#### 1. Map型をオブジェクトに変換
+
+- `app/(user)/calendar/page.tsx`: `Map`型を通常のオブジェクト（`Record<string, T>`）に変換
+- `components/calendar-grid.tsx`: `Map`型とオブジェクト型の両方に対応するようにアクセス方法を修正
+- オブジェクトアクセスの安全化: try-catchでエラーハンドリングを追加
+
+#### 2. TypeScript型エラーの修正
+
+- `app/(user)/calendar/page.tsx`: `targetProfileResult`の型を明示的に指定
+- 型アサーションを使用して、`{ data: { id: string; full_name: string; is_active: boolean } | null; error: any }`の型を明示
+
+#### 3. useSearchParams Suspenseバウンダリの対応
+
+- `app/(auth)/login/page.tsx`: `useSearchParams()`を使用するコンポーネント（`LoginPageContent`）を`Suspense`でラップ
+- フォールバックUIを追加（「読み込み中...」表示）
+
+#### 4. エラーハンドリングとログの追加
+
+- `components/calendar-grid.tsx`: 本番環境でも動作するデバッグログを追加
+- オブジェクトアクセス時のエラーハンドリングを強化
+- ブラウザのコンソールに詳細なログを出力
+
+#### 修正ファイル
+
+- `app/(user)/calendar/page.tsx`:
+  - `Map`型を`Record<string, T>`型に変換
+  - `targetProfileResult`の型を明示的に指定
+- `components/calendar-grid.tsx`:
+  - `Map`型とオブジェクト型の両方に対応するアクセス方法を実装
+  - エラーハンドリングとログを追加
+- `app/(auth)/login/page.tsx`:
+  - `useSearchParams()`を使用するコンポーネントを`Suspense`でラップ
+  - `LoginPageContent`コンポーネントに分離
+
+### 確認事項
+
+- ✅ カレンダーページが正常に表示される
+- ✅ 注文可能日の「注文可」ボタンが表示される
+- ✅ 「注文可」ボタンをクリックして注文ページに遷移できる
+- ✅ ビルドが成功する（TypeScriptエラーなし）
+- ✅ 本番環境でも正常に動作する
+- ✅ ログインページが正常に表示される（Suspenseバウンダリ対応）
+
+### 注意事項
+
+- **Next.jsのシリアライズ制限**: サーバーコンポーネントからクライアントコンポーネントに渡すpropsは、JSONシリアライズ可能である必要があります（`Map`型、`Set`型、関数などは渡せません）
+- **useSearchParams Suspense要件**: Next.js 16では、`useSearchParams()`を使用するコンポーネントは必ず`Suspense`バウンダリでラップする必要があります
+- **デバッグログ**: 本番環境でもデバッグログが出力されるため、必要に応じて削除または条件付きにしてください
+
+---
+
 ## 2026-01-XX（カレンダーページのDATABASE_URL未設定時のフォールバック対応）
 
 ### 問題
