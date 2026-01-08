@@ -91,7 +91,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { invitation_code, invitation_code_max_uses } = body
+    const { invitation_code, invitation_code_max_uses, reset_usage_count } = body
 
     // バリデーション
     if (invitation_code !== undefined && invitation_code !== null) {
@@ -122,9 +122,13 @@ export async function PUT(request: NextRequest) {
 
     const currentSettingsTyped = currentSettings as { invitation_code?: string | null; [key: string]: any } | null
 
-    // 招待コードが変更された場合、使用回数をリセット
+    // 招待コードが変更された場合、または明示的にリセットが要求された場合、使用回数をリセット
     let shouldResetUsageCount = false
-    if (invitation_code !== undefined) {
+    if (reset_usage_count === true) {
+      shouldResetUsageCount = true
+      console.log('=== Usage Count Reset Requested ===')
+      console.log('Will reset usage count explicitly')
+    } else if (invitation_code !== undefined) {
       const currentCode = currentSettingsTyped?.invitation_code?.trim() || ''
       const newCode = invitation_code?.toString().trim() || ''
       if (currentCode !== newCode) {

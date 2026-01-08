@@ -101,16 +101,16 @@ export default function AdminInvitationCodePage() {
       setError(null)
       setSuccess(null)
 
-      // 招待コードを一度変更して戻すことで使用回数をリセット
-      const currentCode = settings.invitation_code
+      // reset_usage_countフラグを使用して使用回数をリセット
       const response = await fetch('/api/admin/invitation-code', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          invitation_code: currentCode,
+          invitation_code: settings.invitation_code,
           invitation_code_max_uses: settings.invitation_code_max_uses,
+          reset_usage_count: true,
         }),
       })
 
