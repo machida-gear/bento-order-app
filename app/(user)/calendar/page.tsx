@@ -379,12 +379,14 @@ export default async function CalendarPage({
   }
 
   // 日付をキーとしたマップを作成（高速検索用）
-  const orderDaysMap = new Map(
-    (orderDays || []).map((day: any) => [day.target_date, day])
-  );
+  // Map型はサーバーコンポーネントからクライアントコンポーネントに渡せないため、通常のオブジェクトに変換
+  const orderDaysMapObj: Record<string, any> = {};
+  (orderDays || []).forEach((day: any) => {
+    orderDaysMapObj[day.target_date] = day;
+  });
 
   // 同じ日に複数の注文がある場合、最初の1つを使用（仕様上1日1注文のみ）
-  const ordersMap = new Map<string, (typeof ordersWithMenu)[0]>();
+  const ordersMapObj: Record<string, (typeof ordersWithMenu)[0]> = {};
 
   for (const order of ordersWithMenu) {
     // order_dateはdate型なので、YYYY-MM-DD形式の文字列として取得される
@@ -405,8 +407,8 @@ export default async function CalendarPage({
     }
 
     // まだこの日付の注文がマップにない場合のみ追加
-    if (!ordersMap.has(dateKey)) {
-      ordersMap.set(dateKey, order);
+    if (!ordersMapObj[dateKey]) {
+      ordersMapObj[dateKey] = order;
     }
   }
 
@@ -504,8 +506,8 @@ export default async function CalendarPage({
       <CalendarGrid
         year={currentYear}
         month={currentMonth}
-        orderDaysMap={orderDaysMap}
-        ordersMap={ordersMap}
+        orderDaysMap={orderDaysMapObj}
+        ordersMap={ordersMapObj}
         maxOrderDaysAhead={systemSettings?.max_order_days_ahead || 30}
         targetUserId={isAdminMode ? targetUserId : undefined}
         isAdminMode={isAdminMode}

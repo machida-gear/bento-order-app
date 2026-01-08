@@ -21,8 +21,8 @@ type Order = Database["public"]["Tables"]["orders"]["Row"] & {
 interface CalendarGridProps {
   year: number;
   month: number;
-  orderDaysMap: Map<string, OrderDay>;
-  ordersMap: Map<string, Order>;
+  orderDaysMap: Map<string, OrderDay> | Record<string, OrderDay>;
+  ordersMap: Map<string, Order> | Record<string, Order>;
   maxOrderDaysAhead: number;
   targetUserId?: string; // 管理者が代理操作する場合の対象ユーザーID
   isAdminMode?: boolean; // 管理者モード（user_idパラメータが指定されている場合）
@@ -173,8 +173,8 @@ export default function CalendarGrid({
           }
 
           const dateStr = formatDateLocal(date);
-          const orderDay = orderDaysMap.get(dateStr);
-          const order = ordersMap.get(dateStr);
+          const orderDay = orderDaysMap instanceof Map ? orderDaysMap.get(dateStr) : (orderDaysMap && typeof orderDaysMap === 'object' ? orderDaysMap[dateStr] : undefined);
+          const order = ordersMap instanceof Map ? ordersMap.get(dateStr) : (ordersMap && typeof ordersMap === 'object' ? ordersMap[dateStr] : undefined);
           const isAvailable = orderDay?.is_available ?? false;
           const isTodayDay = isToday(date);
           const canOrderToday = canOrder(date, orderDay);
