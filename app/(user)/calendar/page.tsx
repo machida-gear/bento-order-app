@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { queryDatabase } from "@/lib/database/query";
+import { getDatabaseUrlOptional } from "@/lib/utils/database";
 import CalendarGrid from "@/components/calendar-grid";
 
 /**
@@ -24,8 +25,12 @@ export default async function CalendarPage({
   // Next.js 16ではsearchParamsがPromise型のため、awaitで解決
   const params = await searchParams;
 
+  // DATABASE_URLが設定されているかチェック
+  const hasDatabaseUrl = !!getDatabaseUrlOptional();
+
   // Transaction connectionを使用してデータを取得（パフォーマンス向上）
-  const calendarData = await queryDatabase(async (client) => {
+  // DATABASE_URLが設定されていない場合はSupabaseクライアントを使用
+  const calendarData = hasDatabaseUrl ? await queryDatabase(async (client) => {
     // 現在のユーザーのプロフィールを取得（管理者権限チェック）
     const profileResult = await client.query(
       'SELECT role, full_name FROM profiles WHERE id = $1',
@@ -65,7 +70,46 @@ export default async function CalendarPage({
       targetUserId,
       targetProfile,
     };
-  });
+  }) : await (async () => {
+    // DATABASE_URLが設定されていない場合のフォールバック処理
+    const profileResult = await supabase
+      .from("profiles")
+      .select("role, full_name")
+      .eq("id", user.id)
+      .single();
+    
+    const currentProfile = profileResult.data as { role?: string; full_name?: string } | null;
+    const isAdmin = currentProfile?.role === "admin";
+    const isAdminMode = isAdmin && params.user_id !== undefined;
+
+    let targetUserId = user.id;
+    let targetProfile: {
+      id: string;
+      full_name: string;
+      is_active: boolean;
+    } | null = null;
+
+    if (isAdminMode && params.user_id) {
+      const targetProfileResult = await supabase
+        .from("profiles")
+        .select("id, full_name, is_active")
+        .eq("id", params.user_id)
+        .single();
+
+      if (targetProfileResult.data) {
+        const profileData = targetProfileResult.data as { id: string; full_name: string; is_active: boolean };
+        targetUserId = params.user_id;
+        targetProfile = profileData;
+      }
+    }
+
+    return {
+      isAdmin,
+      isAdminMode,
+      targetUserId,
+      targetProfile,
+    };
+  })();
 
   const { isAdmin, isAdminMode, targetUserId, targetProfile } = calendarData;
 
@@ -111,7 +155,8 @@ export default async function CalendarPage({
   const endDateStr = formatDateLocal(lastDayOfMonth);
 
   // Transaction connectionを使用してデータを取得（パフォーマンス向上）
-  const { orderDays, orders, systemSettings, calendarError, ordersError } = await queryDatabase(async (client): Promise<{
+  // DATABASE_URLが設定されていない場合はSupabaseクライアントを使用
+  const { orderDays, orders, systemSettings, calendarError, ordersError } = hasDatabaseUrl ? await queryDatabase(async (client): Promise<{
     orderDays: any[];
     orders: any[];
     systemSettings: any;
@@ -150,7 +195,82 @@ export default async function CalendarPage({
       calendarError: null,
       ordersError: null,
     };
-  });
+  }) : await (async () => {
+    // DATABASE_URLが設定されていない場合のフォールバック処理
+    try {
+      // まず管理者モードの判定を行う（targetUserIdを決定するため）
+      const profileResult = await supabase
+        .from("profiles")
+        .select("role, full_name")
+        .eq("id", user.id)
+        .single();
+      
+      const currentProfile = profileResult.data as { role?: string; full_name?: string } | null;
+      const isAdmin = currentProfile?.role === "admin";
+      const isAdminMode = isAdmin && params.user_id !== undefined;
+
+      let targetUserId = user.id;
+      
+      if (isAdminMode && params.user_id) {
+        const targetProfileResult = await supabase
+          .from("profiles")
+          .select("id, full_name, is_active")
+          .eq("id", params.user_id)
+          .single();
+
+        if (targetProfileResult.data) {
+          targetUserId = params.user_id;
+        }
+      }
+
+      // カレンダーデータを取得
+      const calendarResult = await supabase
+        .from("order_calendar")
+        .select("*")
+        .gte("target_date", startDateStr)
+        .lte("target_date", endDateStr)
+        .order("target_date", { ascending: true });
+      
+      const orderDays = calendarResult.data || [];
+
+      // 注文データを取得（targetUserIdを使用）
+      const ordersResult = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", targetUserId)
+        .eq("status", "ordered")
+        .gte("order_date", startDateStr)
+        .lte("order_date", endDateStr)
+        .order("order_date", { ascending: true });
+
+      const orders = ordersResult.data || [];
+
+      // システム設定を取得
+      const settingsResult = await supabase
+        .from("system_settings")
+        .select("max_order_days_ahead")
+        .eq("id", 1)
+        .single();
+
+      const systemSettings = settingsResult.data || null;
+
+      return {
+        orderDays,
+        orders,
+        systemSettings,
+        calendarError: calendarResult.error ? new Error(calendarResult.error.message) : null,
+        ordersError: ordersResult.error ? new Error(ordersResult.error.message) : null,
+      };
+    } catch (error) {
+      return {
+        orderDays: [],
+        orders: [],
+        systemSettings: null,
+        calendarError: error instanceof Error ? error : new Error("Unknown error"),
+        ordersError: error instanceof Error ? error : new Error("Unknown error"),
+      };
+    }
+  })();
 
   // メニューデータを取得（注文がある場合のみ）
   // Transaction connectionを使用してメニューと業者情報を取得
@@ -173,7 +293,8 @@ export default async function CalendarPage({
 
     if (menuItemIds.length > 0) {
       // Transaction connectionを使用してメニューと業者情報を取得
-      const menuData = await queryDatabase(async (client) => {
+      // DATABASE_URLが設定されていない場合はSupabaseクライアントを使用
+      const menuData = hasDatabaseUrl ? await queryDatabase(async (client) => {
         // メニュー情報を取得（JOINで業者情報も取得）
         const menuResult = await client.query(
           `SELECT 
@@ -197,7 +318,33 @@ export default async function CalendarPage({
             name: row.vendor_name,
           } : null,
         }));
-      });
+      }) : await (async () => {
+        // DATABASE_URLが設定されていない場合のフォールバック処理
+        // Supabaseクライアントでは文字列または数値の配列を使用
+        const menuResult = await supabase
+          .from("menu_items")
+          .select(`
+            id,
+            name,
+            vendor_id,
+            vendors:vendor_id (
+              id,
+              name
+            )
+          `)
+          .in("id", menuItemIds)
+          .eq("is_active", true);
+
+        return (menuResult.data || []).map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          vendor_id: String(item.vendor_id),
+          vendors: item.vendors ? {
+            id: String(item.vendors.id),
+            name: item.vendors.name,
+          } : null,
+        }));
+      })();
 
       // メニューIDを文字列に変換してマップを作成
       const menuItemsMap = new Map(

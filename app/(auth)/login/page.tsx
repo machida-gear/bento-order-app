@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Supabaseのエラーメッセージを日本語に変換する関数
@@ -48,6 +48,8 @@ function translateAuthError(message: string): string {
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState(""); // パスワードリセット用：新しいパスワード
+  const [confirmPassword, setConfirmPassword] = useState(""); // パスワードリセット用：パスワード確認
   const [name, setName] = useState(""); // 新規登録用：氏名
   const [employeeCode, setEmployeeCode] = useState(""); // 新規登録用：社員コード
   const [invitationCode, setInvitationCode] = useState(""); // 新規登録用：招待コード
@@ -56,8 +58,44 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(false);
+  const [isUpdatePassword, setIsUpdatePassword] = useState(false); // パスワード更新モード
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // URLパラメータからパスワードリセットトークンを検出
+  useEffect(() => {
+    // URLハッシュからトークンを確認（Supabaseのパスワードリセットリンクはハッシュに含まれる）
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const accessToken = hashParams.get("access_token");
+        const type = hashParams.get("type");
+
+        // パスワードリセットタイプの場合
+        if (type === "recovery" && accessToken) {
+          setIsUpdatePassword(true);
+          setIsResetPassword(false);
+          setIsSignup(false);
+          // URLからハッシュを削除（見た目をクリーンにするため）
+          // ただし、Supabaseのセッションはハッシュから復元されるので、クライアント側で保持
+          const newUrl =
+            window.location.pathname + (window.location.search || "");
+          window.history.replaceState(null, "", newUrl);
+          return;
+        }
+      }
+
+      // クエリパラメータも確認（従来の方式との互換性）
+      const resetParam = searchParams?.get("reset");
+      if (resetParam === "true") {
+        // クエリパラメータのみでreset=trueの場合は、ハッシュを待つ
+        // 実際のトークンはハッシュから来るため、ここでは何もしない
+      }
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +224,7 @@ export default function LoginPage() {
     try {
       if (!email) {
         setError("メールアドレスを入力してください");
+        setLoading(false);
         return;
       }
 
@@ -215,6 +254,7 @@ export default function LoginPage() {
 
       if (resetError) {
         setError(translateAuthError(resetError.message));
+        setLoading(false);
         return;
       }
 
@@ -226,6 +266,64 @@ export default function LoginPage() {
       console.error("Reset password error:", err);
       setError("パスワードリセット処理中にエラーが発生しました");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      // バリデーション
+      if (!newPassword) {
+        setError("新しいパスワードを入力してください");
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        setError("パスワードは6文字以上で入力してください");
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setError("パスワードが一致しません");
+        setLoading(false);
+        return;
+      }
+
+      // パスワードを更新
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        setError(translateAuthError(updateError.message));
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(
+        "パスワードを更新しました。新しいパスワードでログインしてください。"
+      );
+
+      // フォームをクリア
+      setNewPassword("");
+      setConfirmPassword("");
+      setIsUpdatePassword(false);
+
+      // 3秒後にログイン画面に戻る
+      setTimeout(() => {
+        router.push("/login");
+        router.refresh();
+      }, 3000);
+    } catch (err) {
+      console.error("Update password error:", err);
+      setError("パスワード更新処理中にエラーが発生しました");
       setLoading(false);
     }
   };
@@ -243,7 +341,9 @@ export default function LoginPage() {
               お弁当注文システム
             </h1>
             <p className="text-gray-500 mt-2">
-              {isResetPassword
+              {isUpdatePassword
+                ? "新しいパスワードを設定"
+                : isResetPassword
                 ? "パスワードリセット"
                 : isSignup
                 ? "新規アカウント登録"
@@ -268,7 +368,9 @@ export default function LoginPage() {
           {/* ログインフォーム / 新規登録フォーム / パスワードリセットフォーム */}
           <form
             onSubmit={
-              isResetPassword
+              isUpdatePassword
+                ? handleUpdatePassword
+                : isResetPassword
                 ? handleResetPassword
                 : isSignup
                 ? handleSignup
@@ -366,24 +468,69 @@ export default function LoginPage() {
               />
             </div>
 
-            {!isResetPassword && (
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  パスワード
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
-                  placeholder="••••••••"
-                />
-              </div>
+            {isUpdatePassword ? (
+              <>
+                <div>
+                  <label
+                    htmlFor="newPassword"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    新しいパスワード <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
+                    placeholder="••••••••"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    6文字以上で入力してください
+                  </p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    新しいパスワード（確認）{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </>
+            ) : (
+              !isResetPassword && (
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    パスワード
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
+                    placeholder="••••••••"
+                  />
+                </div>
+              )
             )}
 
             <button
@@ -414,11 +561,15 @@ export default function LoginPage() {
                 </svg>
               )}
               {loading
-                ? isResetPassword
+                ? isUpdatePassword
+                  ? "更新中..."
+                  : isResetPassword
                   ? "送信中..."
                   : isSignup
                   ? "登録中..."
                   : "ログイン中..."
+                : isUpdatePassword
+                ? "パスワードを更新"
                 : isResetPassword
                 ? "リセットメールを送信"
                 : isSignup
@@ -429,7 +580,22 @@ export default function LoginPage() {
 
           {/* ログイン/新規登録/パスワードリセット 切り替え */}
           <div className="mt-6 space-y-2 text-center">
-            {!isResetPassword && (
+            {isUpdatePassword && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUpdatePassword(false);
+                  setError(null);
+                  setSuccess(null);
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+                className="text-sm text-amber-600 hover:text-amber-700 font-medium block"
+              >
+                ログインに戻る
+              </button>
+            )}
+            {!isResetPassword && !isUpdatePassword && (
               <button
                 type="button"
                 onClick={() => {
@@ -469,7 +635,7 @@ export default function LoginPage() {
 
         {/* フッター */}
         <p className="text-center text-gray-400 text-sm mt-6">
-          © 2026 お弁当注文システム
+          © 2026 MACHIDA GEAR
         </p>
       </div>
     </div>
