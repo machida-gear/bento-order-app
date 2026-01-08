@@ -90,16 +90,17 @@ export default function CalendarGrid({
 
   // #region agent log
   if (typeof window !== 'undefined') {
-    const logData = {location:'calendar-grid.tsx:82',message:'Mounted state check',data:{isMounted,hasToday:!!today,hasNow:!!now,todayValue:today?.toISOString(),nowValue:now?.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+    const logData = {location:'calendar-grid.tsx:82',message:'Mounted state check',data:{isMounted,hasToday:!!today,hasNow:!!now,todayValue:today?.toISOString(),nowValue:now?.toISOString(),year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
   }
   // #endregion
-  // サーバー側レンダリング時は空の状態を返す（hydration mismatchを防ぐ）
+  // サーバー側レンダリング時のみ空の状態を返す（hydration mismatchを防ぐ）
+  // 年月が変更された場合は、isMountedがtrueなので空のカレンダーを表示しない（ちらつき防止）
   if (!isMounted || !today || !now) {
     // #region agent log
     if (typeof window !== 'undefined') {
-      const logData = {location:'calendar-grid.tsx:83',message:'Returning empty calendar (not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      const logData = {location:'calendar-grid.tsx:83',message:'Returning empty calendar (not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
       console.log('[DEBUG]', logData);
       fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     }
@@ -439,9 +440,16 @@ function CalendarCell({
     }
 
     // 過去の日付は変更不可
-    const orderDateObj = new Date(order.order_date + "T00:00:00");
+    // order.order_dateはYYYY-MM-DD形式の文字列の可能性があるため、正規化
+    const orderDateStr = typeof order.order_date === 'string' 
+      ? order.order_date.split('T')[0].split(' ')[0]
+      : String(order.order_date).split('T')[0].split(' ')[0];
+    const orderDateObj = new Date(orderDateStr + "T00:00:00");
     const todayDate = new Date(today);
     todayDate.setHours(0, 0, 0, 0);
+    orderDateObj.setHours(0, 0, 0, 0);
+    
+    // 過去の日付は変更不可
     if (orderDateObj < todayDate) return false;
 
     // 今日の場合、締切時刻をチェック
@@ -494,7 +502,13 @@ function CalendarCell({
                   targetUserId ? `?user_id=${targetUserId}` : ""
                 }`}
                 className="block"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // 念のため、再度チェック（念押し）
+                  if (!canEdit) {
+                    e.preventDefault();
+                  }
+                }}
               >
                 <div className="text-xs sm:text-xs md:text-xs text-blue-700 font-medium truncate leading-tight hover:text-blue-800 hover:underline cursor-pointer">
                   {menuName}
