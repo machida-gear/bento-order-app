@@ -154,6 +154,12 @@ export default async function CalendarPage({
   const startDateStr = formatDateLocal(firstDayOfMonth);
   const endDateStr = formatDateLocal(lastDayOfMonth);
 
+  // #region agent log
+  try {
+    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:156',message:'Date range for query',data:{currentYear,currentMonth,currentMonthDisplay,startDateStr,endDateStr,firstDayOfMonth:firstDayOfMonth.toISOString(),lastDayOfMonth:lastDayOfMonth.toISOString(),hasDatabaseUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
+
   // Transaction connectionを使用してデータを取得（パフォーマンス向上）
   // DATABASE_URLが設定されていない場合はSupabaseクライアントを使用
   const { orderDays, orders, systemSettings, calendarError, ordersError } = hasDatabaseUrl ? await queryDatabase(async (client): Promise<{
@@ -171,6 +177,12 @@ export default async function CalendarPage({
       [startDateStr, endDateStr]
     );
     const orderDays = calendarResult.rows;
+
+    // #region agent log
+    try {
+      await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:173',message:'orderDays fetched (Transaction)',data:{orderDaysCount:orderDays.length,orderDaysSample:orderDays.slice(0,3).map((d:any)=>({target_date:d.target_date,is_available:d.is_available})),startDateStr,endDateStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    } catch (e) {}
+    // #endregion
 
     // 注文データを取得（RLSをバイパスするため、直接PostgreSQL接続を使用）
     const ordersResult = await client.query(
@@ -232,6 +244,12 @@ export default async function CalendarPage({
         .order("target_date", { ascending: true });
       
       const orderDays = calendarResult.data || [];
+
+      // #region agent log
+      try {
+        await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:234',message:'orderDays fetched (Supabase)',data:{orderDaysCount:orderDays.length,orderDaysSample:orderDays.slice(0,3).map((d:any)=>({target_date:d.target_date,is_available:d.is_available})),startDateStr,endDateStr,calendarError:calendarResult.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      } catch (e) {}
+      // #endregion
 
       // 注文データを取得（targetUserIdを使用）
       const ordersResult = await supabase
@@ -382,8 +400,30 @@ export default async function CalendarPage({
   // Map型はサーバーコンポーネントからクライアントコンポーネントに渡せないため、通常のオブジェクトに変換
   const orderDaysMapObj: Record<string, any> = {};
   (orderDays || []).forEach((day: any) => {
-    orderDaysMapObj[day.target_date] = day;
+    // target_dateがDateオブジェクトの場合は文字列に変換
+    const dateKey = day.target_date instanceof Date 
+      ? formatDateLocal(day.target_date)
+      : typeof day.target_date === 'string'
+      ? day.target_date.split('T')[0] // タイムスタンプ部分を削除
+      : String(day.target_date).split('T')[0];
+    orderDaysMapObj[dateKey] = day;
   });
+
+  // #region agent log
+  try {
+    const sampleDays = (orderDays || []).slice(0, 5).map((d: any) => ({
+      target_date: d.target_date,
+      target_date_type: typeof d.target_date,
+      is_available: d.is_available,
+      mapped_key: d.target_date instanceof Date 
+        ? formatDateLocal(d.target_date)
+        : typeof d.target_date === 'string'
+        ? d.target_date.split('T')[0]
+        : String(d.target_date).split('T')[0]
+    }));
+    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:390',message:'orderDaysMapObj created',data:{orderDaysCount:orderDays?.length||0,orderDaysMapObjKeysCount:Object.keys(orderDaysMapObj).length,orderDaysMapObjKeys:Object.keys(orderDaysMapObj).slice(0,10),sampleDays},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  } catch (e) {}
+  // #endregion
 
   // 同じ日に複数の注文がある場合、最初の1つを使用（仕様上1日1注文のみ）
   const ordersMapObj: Record<string, (typeof ordersWithMenu)[0]> = {};
