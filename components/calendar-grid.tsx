@@ -88,13 +88,13 @@ export default function CalendarGrid({
     }
     
     // localStorageに値がない場合、または古い値の場合は新規作成
-    setIsMounted(true);
     const currentDate = new Date();
     const currentNow = new Date();
     todayRef.current = currentDate;
     nowRef.current = currentNow;
     setToday(currentDate);
     setNow(currentNow);
+    setIsMounted(true);
     
     // localStorageに値を保存（月変更時のちらつき防止）
     try {
@@ -112,9 +112,26 @@ export default function CalendarGrid({
   }, []);
 
   // 年月が変更されたときに、localStorageから値を復元（ちらつき防止）
+  // ただし、既にisMountedがtrueの場合は、値を保持する（再マウントされていない場合）
   useEffect(() => {
-    if (!isMounted && typeof window !== 'undefined') {
-      // localStorageから値を復元
+    if (typeof window !== 'undefined') {
+      // #region agent log
+      const logStart = {location:'calendar-grid.tsx:115',message:'useEffect: year/month changed',data:{year,month,isMounted,hasToday:!!today,hasNow:!!now},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
+      console.log('[DEBUG]', logStart);
+      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logStart)}).catch(()=>{});
+      // #endregion
+      
+      // 既にisMountedがtrueで、todayとnowが設定されている場合は、値を保持（再マウントされていない）
+      if (isMounted && today && now) {
+        // #region agent log
+        const logKept = {location:'calendar-grid.tsx:120',message:'useEffect: keeping existing values (not remounted)',data:{year,month,isMounted,today:today.toISOString(),now:now.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
+        console.log('[DEBUG]', logKept);
+        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logKept)}).catch(()=>{});
+        // #endregion
+        return;
+      }
+      
+      // isMountedがfalseの場合、またはtoday/nowがnullの場合は、localStorageから値を復元
       try {
         const savedToday = localStorage.getItem('calendar_today');
         const savedNow = localStorage.getItem('calendar_now');
@@ -131,7 +148,7 @@ export default function CalendarGrid({
             nowRef.current = savedNowDate;
             setIsMounted(true);
             // #region agent log
-            const logRestored = {location:'calendar-grid.tsx:82',message:'useEffect: restored from localStorage (year/month changed)',data:{year,month,isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
+            const logRestored = {location:'calendar-grid.tsx:140',message:'useEffect: restored from localStorage (year/month changed)',data:{year,month,isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
             console.log('[DEBUG]', logRestored);
             fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logRestored)}).catch(()=>{});
             // #endregion
@@ -158,8 +175,14 @@ export default function CalendarGrid({
       } catch (e) {
         // localStorageが使用できない場合は無視
       }
+      
+      // #region agent log
+      const logCreated = {location:'calendar-grid.tsx:165',message:'useEffect: created new values (year/month changed)',data:{year,month,isMounted:true,today:currentDate.toISOString(),now:currentNow.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
+      console.log('[DEBUG]', logCreated);
+      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logCreated)}).catch(()=>{});
+      // #endregion
     }
-  }, [year, month]);
+  }, [year, month, isMounted, today, now]);
 
   // デバッグ用: propsが正しく渡されているか確認（本番環境でも確認可能）
   useEffect(() => {
@@ -226,7 +249,11 @@ export default function CalendarGrid({
 
   // クライアント側で初回マウント前の場合のみ空のカレンダーを表示
   // 年月が変わっても、isMountedがtrueでtodayとnowが設定されていれば、空のカレンダーを表示しない（ちらつき防止）
-  if (!isMounted || !today || !now) {
+  // useRefの値もチェック（localStorageから復元された値がある場合）
+  const effectiveToday = today || todayRef.current;
+  const effectiveNow = now || nowRef.current;
+  
+  if (!isMounted || !effectiveToday || !effectiveNow) {
     // #region agent log
     if (typeof window !== 'undefined') {
       const logData = {location:'calendar-grid.tsx:131',message:'Returning empty calendar (client not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
@@ -293,17 +320,20 @@ export default function CalendarGrid({
     );
   }
 
+  // effectiveTodayとeffectiveNowを使用（useRefから復元された値も考慮）
+  // レンダリング条件でnullチェック済みのため、ここでは非nullアサーションを使用
+  const todayYear = effectiveToday!.getFullYear();
+  const todayMonth = effectiveToday!.getMonth();
+  const todayDate = effectiveToday!.getDate();
+  
   // #region agent log
   if (typeof window !== 'undefined') {
     const orderDaysMapKeys = orderDaysMap instanceof Map ? [] : Object.keys(orderDaysMap || {});
-    const logData = {location:'calendar-grid.tsx:107',message:'Calendar rendered (mounted)',data:{year,month,todayYear:today.getFullYear(),todayMonth:today.getMonth(),todayDate:today.getDate(),orderDaysMapKeysCount:orderDaysMapKeys.length,orderDaysMapSample:orderDaysMapKeys.slice(0,5),maxOrderDaysAhead,isAdminMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+    const logData = {location:'calendar-grid.tsx:107',message:'Calendar rendered (mounted)',data:{year,month,todayYear:effectiveToday!.getFullYear(),todayMonth:effectiveToday!.getMonth(),todayDate:effectiveToday!.getDate(),orderDaysMapKeysCount:orderDaysMapKeys.length,orderDaysMapSample:orderDaysMapKeys.slice(0,5),maxOrderDaysAhead,isAdminMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
     console.log('[DEBUG]', logData);
     fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
   }
   // #endregion
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth();
-  const todayDate = today.getDate();
 
   // ローカルタイムゾーンで日付文字列を取得（YYYY-MM-DD形式）
   const formatDateLocal = (date: Date): string => {
@@ -399,10 +429,10 @@ export default function CalendarGrid({
       const deadline = new Date(today);
       deadline.setHours(hours, minutes, 0, 0);
 
-      if (now >= deadline) {
+      if (effectiveNow! >= deadline) {
         // #region agent log
         if (typeof window !== 'undefined') {
-          const logData = {location:'calendar-grid.tsx:174',message:'canOrder: deadline passed',data:{dateStr,now:now.toISOString(),deadline:deadline.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+          const logData = {location:'calendar-grid.tsx:174',message:'canOrder: deadline passed',data:{dateStr,now:effectiveNow!.toISOString(),deadline:deadline.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
           console.log('[DEBUG]', logData);
           fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
         }
@@ -562,7 +592,7 @@ export default function CalendarGrid({
                 orderDateStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}-${String(orderDate.getDate()).padStart(2, "0")}`;
               }
               
-              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+              const todayStr = `${effectiveToday!.getFullYear()}-${String(effectiveToday!.getMonth() + 1).padStart(2, "0")}-${String(effectiveToday!.getDate()).padStart(2, "0")}`;
               
               // #region agent log
               if (typeof window !== 'undefined' && (dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14')) {
@@ -583,9 +613,9 @@ export default function CalendarGrid({
                 const isTodayDate = orderDateStr === todayStr;
                 if (isTodayDate && orderDay.deadline_time) {
                   const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
-                  const deadline = new Date(today);
+                  const deadline = new Date(effectiveToday!);
                   deadline.setHours(hours, minutes, 0, 0);
-                  canEditOrderValue = now.getTime() < deadline.getTime();
+                  canEditOrderValue = effectiveNow!.getTime() < deadline.getTime();
                 } else {
                   canEditOrderValue = true;
                 }
@@ -678,8 +708,8 @@ export default function CalendarGrid({
                 exceedsMaxDays={exceedsMaxDays}
                 targetUserId={targetUserId}
                 isAdminMode={isAdminMode}
-                today={today}
-                now={now}
+                today={effectiveToday!}
+                now={effectiveNow!}
                 canEditOrderValue={canEditOrderValue}
                 shouldBeGray={shouldBeGray}
               />
