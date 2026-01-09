@@ -447,7 +447,8 @@ function CalendarCell({
       : String(order.order_date).split('T')[0].split(' ')[0];
     
     // ローカルタイムゾーンで日付文字列を比較（タイムゾーンの影響を排除）
-    const todayStr = formatDateLocal(today);
+    // formatDateLocalはCalendarGridのスコープ内にあるため、ここで直接作成
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     
     // #region agent log
     if (typeof window !== 'undefined' && order.id) {
