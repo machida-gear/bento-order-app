@@ -80,6 +80,7 @@
 | [カレンダーページ全日付グレーアウト問題修正.md](./カレンダーページ全日付グレーアウト問題修正.md) | カレンダーページの全日付グレーアウト問題修正（`target_date`フォーマット正規化、`orderDaysMap`キーマッピング修正） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 | [カレンダーページ過去注文・ちらつき問題修正.md](./カレンダーページ過去注文・ちらつき問題修正.md) | カレンダーページの過去注文クリック・月変更時のちらつき問題修正（`canEditOrder()`削除、`shouldBeGray`チェック修正、`localStorage`による状態保持） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 | [カレンダーページ13日セル表示問題修正.md](./カレンダーページ13日セル表示問題修正.md) | カレンダーページの13日セル表示問題修正（`order.order_date`がDateオブジェクトの場合の処理追加、Hydration Mismatch再発修正） | CHANGELOG.md, PROGRESS.md, SPEC.md |
+| [カレンダーページリサイズ問題修正.md](./カレンダーページリサイズ問題修正.md) | カレンダーページのリサイズ問題修正（空のカレンダーにpadding追加、`requestAnimationFrame`で`isMounted`更新を遅延） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 
 ### 運用・設定ドキュメント
 
@@ -197,4 +198,4 @@ docs/TODO.md
 
 ---
 
-最終更新日: 2026-01-XX（カレンダーページ13日セル表示問題修正完了時点）
+最終更新日: 2026-01-XX（カレンダーページリサイズ問題修正完了時点）

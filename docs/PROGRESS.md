@@ -145,6 +145,7 @@
 - [x] 月変更時の画面ちらつき修正（`localStorage`からの初期値復元、状態保持）
 - [x] 13日セル表示問題修正（`order.order_date`がDateオブジェクトの場合の処理追加、`YYYY-MM-DD`形式への変換）
 - [x] Hydration Mismatch再発修正（`useState`初期値から`localStorage`アクセス削除）
+- [x] カレンダーリサイズ問題修正（空のカレンダーにpadding追加、`requestAnimationFrame`で`isMounted`更新を遅延）
 
 ### 注文可否判定
 
