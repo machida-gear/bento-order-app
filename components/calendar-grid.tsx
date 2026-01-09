@@ -566,7 +566,10 @@ export default function CalendarGrid({
               
               // #region agent log
               if (typeof window !== 'undefined' && (dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14')) {
-                const logData = {location:'calendar-grid.tsx:551',message:'orderDateStr calculation',data:{dateStr,orderId:order.id,orderDateType:typeof order.order_date,orderDateIsDate:order.order_date instanceof Date,orderDateOriginal:order.order_date instanceof Date ? order.order_date.toISOString() : String(order.order_date),orderDateStr,todayStr,orderDateStrLessThanToday:orderDateStr < todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'};
+                const orderDateValueForLog = order.order_date as string | Date;
+                const orderDateIsDate = orderDateValueForLog instanceof Date;
+                const orderDateOriginal = orderDateIsDate ? orderDateValueForLog.toISOString() : String(orderDateValueForLog);
+                const logData = {location:'calendar-grid.tsx:551',message:'orderDateStr calculation',data:{dateStr,orderId:order.id,orderDateType:typeof order.order_date,orderDateIsDate,orderDateOriginal,orderDateStr,todayStr,orderDateStrLessThanToday:orderDateStr < todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'};
                 console.log('[DEBUG]', logData);
                 fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
               }
