@@ -74,7 +74,10 @@ export default function CalendarGrid({
           setNow(savedNowDate);
           todayRef.current = savedTodayDate;
           nowRef.current = savedNowDate;
-          setIsMounted(true);
+          // 次のフレームでisMountedをtrueにする（レイアウトの再計算を防ぐ）
+          requestAnimationFrame(() => {
+            setIsMounted(true);
+          });
           // #region agent log
           const logRestored = {location:'calendar-grid.tsx:58',message:'useEffect: restored from localStorage',data:{isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
           console.log('[DEBUG]', logRestored);
@@ -94,7 +97,10 @@ export default function CalendarGrid({
     nowRef.current = currentNow;
     setToday(currentDate);
     setNow(currentNow);
-    setIsMounted(true);
+    // 次のフレームでisMountedをtrueにする（レイアウトの再計算を防ぐ）
+    requestAnimationFrame(() => {
+      setIsMounted(true);
+    });
     
     // localStorageに値を保存（月変更時のちらつき防止）
     try {
@@ -146,7 +152,10 @@ export default function CalendarGrid({
             setNow(savedNowDate);
             todayRef.current = savedTodayDate;
             nowRef.current = savedNowDate;
-            setIsMounted(true);
+            // 次のフレームでisMountedをtrueにする（レイアウトの再計算を防ぐ）
+            requestAnimationFrame(() => {
+              setIsMounted(true);
+            });
             // #region agent log
             const logRestored = {location:'calendar-grid.tsx:140',message:'useEffect: restored from localStorage (year/month changed)',data:{year,month,isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
             console.log('[DEBUG]', logRestored);
@@ -166,7 +175,10 @@ export default function CalendarGrid({
       nowRef.current = currentNow;
       setToday(currentDate);
       setNow(currentNow);
-      setIsMounted(true);
+      // 次のフレームでisMountedをtrueにする（レイアウトの再計算を防ぐ）
+      requestAnimationFrame(() => {
+        setIsMounted(true);
+      });
       
       // localStorageに値を保存
       try {
@@ -239,7 +251,7 @@ export default function CalendarGrid({
           {Array.from({ length: 42 }).map((_, index) => (
             <div
               key={index}
-              className="border border-transparent rounded-lg min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
+              className="border border-transparent rounded-lg p-1.5 sm:p-2 md:p-2 min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
             />
           ))}
         </div>
@@ -278,7 +290,7 @@ export default function CalendarGrid({
           {Array.from({ length: 42 }).map((_, index) => (
             <div
               key={index}
-              className="border border-transparent rounded-lg min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
+              className="border border-transparent rounded-lg p-1.5 sm:p-2 md:p-2 min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
             />
           ))}
         </div>
@@ -312,7 +324,7 @@ export default function CalendarGrid({
           {Array.from({ length: 42 }).map((_, index) => (
             <div
               key={index}
-              className="border border-transparent rounded-lg min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
+              className="border border-transparent rounded-lg p-1.5 sm:p-2 md:p-2 min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
             />
           ))}
         </div>
@@ -506,7 +518,7 @@ export default function CalendarGrid({
             return (
               <div
                 key={index}
-                className="border border-transparent rounded-lg min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
+                className="border border-transparent rounded-lg p-1.5 sm:p-2 md:p-2 min-h-[90px] sm:min-h-[100px] md:min-h-[90px]"
               />
             );
           }
