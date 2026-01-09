@@ -96,15 +96,16 @@ export default function CalendarGrid({
   }
   // #endregion
   // サーバー側レンダリング時のみ空の状態を返す（hydration mismatchを防ぐ）
-  // 年月が変更された場合は、isMountedがtrueなので空のカレンダーを表示しない（ちらつき防止）
-  if (!isMounted || !today || !now) {
+  // クライアント側では、isMountedがtrueの場合、年月が変わっても空のカレンダーを表示しない（ちらつき防止）
+  if (typeof window === 'undefined' || (!isMounted || !today || !now)) {
     // #region agent log
     if (typeof window !== 'undefined') {
-      const logData = {location:'calendar-grid.tsx:83',message:'Returning empty calendar (not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      const logData = {location:'calendar-grid.tsx:100',message:'Returning empty calendar (not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month,isServer:typeof window === 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
       console.log('[DEBUG]', logData);
       fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
     }
     // #endregion
+    // サーバー側または初回マウント前のみ空のカレンダーを表示
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
         <div className="grid grid-cols-7 gap-1 mb-1 sm:mb-1 md:mb-1">
@@ -444,24 +445,61 @@ function CalendarCell({
     const orderDateStr = typeof order.order_date === 'string' 
       ? order.order_date.split('T')[0].split(' ')[0]
       : String(order.order_date).split('T')[0].split(' ')[0];
-    const orderDateObj = new Date(orderDateStr + "T00:00:00");
-    const todayDate = new Date(today);
-    todayDate.setHours(0, 0, 0, 0);
-    orderDateObj.setHours(0, 0, 0, 0);
     
-    // 過去の日付は変更不可
-    if (orderDateObj < todayDate) return false;
-
-    // 今日の場合、締切時刻をチェック
-    const isTodayDate = orderDateObj.getTime() === todayDate.getTime();
-    if (isTodayDate && orderDay.deadline_time) {
-      const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
-      const deadline = new Date(todayDate);
-      deadline.setHours(hours, minutes, 0, 0);
-
-      if (now >= deadline) return false;
+    // ローカルタイムゾーンで日付文字列を比較（タイムゾーンの影響を排除）
+    const todayStr = formatDateLocal(today);
+    
+    // #region agent log
+    if (typeof window !== 'undefined' && order.id) {
+      const logData = {location:'calendar-grid.tsx:450',message:'canEditOrder check',data:{orderId:order.id,orderDateStr,todayStr,orderDateStrLessThanToday:orderDateStr < todayStr,hasOrderDay:!!orderDay,deadlineTime:orderDay?.deadline_time},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+      console.log('[DEBUG]', logData);
+      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+    }
+    // #endregion
+    
+    // 過去の日付は変更不可（文字列比較でタイムゾーンの影響を排除）
+    if (orderDateStr < todayStr) {
+      // #region agent log
+      if (typeof window !== 'undefined' && order.id) {
+        const logData = {location:'calendar-grid.tsx:456',message:'canEditOrder: past date',data:{orderId:order.id,orderDateStr,todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+        console.log('[DEBUG]', logData);
+        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+      }
+      // #endregion
+      return false;
     }
 
+    // 今日の場合、締切時刻をチェック
+    const isTodayDate = orderDateStr === todayStr;
+    if (isTodayDate && orderDay.deadline_time) {
+      const [hours, minutes] = orderDay.deadline_time.split(":").map(Number);
+      // ローカルタイムゾーンで締切時刻を作成（タイムゾーンの影響を排除）
+      const deadline = new Date(today);
+      deadline.setHours(hours, minutes, 0, 0);
+      
+      // 現在時刻と比較（タイムスタンプで比較してタイムゾーンの影響を排除）
+      const nowTime = now.getTime();
+      const deadlineTime = deadline.getTime();
+
+      if (nowTime >= deadlineTime) {
+        // #region agent log
+        if (typeof window !== 'undefined' && order.id) {
+          const logData = {location:'calendar-grid.tsx:479',message:'canEditOrder: deadline passed',data:{orderId:order.id,orderDateStr,now:now.toISOString(),deadline:deadline.toISOString(),nowTime,deadlineTime,timeDiff:nowTime - deadlineTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+          console.log('[DEBUG]', logData);
+          fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+        }
+        // #endregion
+        return false;
+      }
+    }
+
+    // #region agent log
+    if (typeof window !== 'undefined' && order.id) {
+      const logData = {location:'calendar-grid.tsx:478',message:'canEditOrder: returning true',data:{orderId:order.id,orderDateStr,todayStr,isTodayDate,hasDeadline:!!orderDay.deadline_time},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+      console.log('[DEBUG]', logData);
+      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+    }
+    // #endregion
     return true;
   };
 
@@ -505,8 +543,17 @@ function CalendarCell({
                 onClick={(e) => {
                   e.stopPropagation();
                   // 念のため、再度チェック（念押し）
-                  if (!canEdit) {
+                  const canEditNow = canEditOrder();
+                  if (!canEditNow) {
+                    // #region agent log
+                    if (typeof window !== 'undefined') {
+                      const logData = {location:'calendar-grid.tsx:540',message:'Link click prevented',data:{orderId:order.id,canEdit,canEditNow},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+                      console.log('[DEBUG]', logData);
+                      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+                    }
+                    // #endregion
                     e.preventDefault();
+                    alert('締切時刻を過ぎているため、注文を変更できません');
                   }
                 }}
               >
