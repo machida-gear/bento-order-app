@@ -143,6 +143,8 @@
 - [x] 全日付グレーアウト問題修正（`target_date`フォーマット正規化、`orderDaysMap`キーマッピング修正）
 - [x] 過去注文クリック問題修正（削除済み`canEditOrder()`呼び出し削除、`shouldBeGray`と`canEditOrderValue`の直接チェック）
 - [x] 月変更時の画面ちらつき修正（`localStorage`からの初期値復元、状態保持）
+- [x] 13日セル表示問題修正（`order.order_date`がDateオブジェクトの場合の処理追加、`YYYY-MM-DD`形式への変換）
+- [x] Hydration Mismatch再発修正（`useState`初期値から`localStorage`アクセス削除）
 
 ### 注文可否判定
 
@@ -150,6 +152,7 @@
 - [x] 締切時刻の判定
 - [x] 注文可能日の判定
 - [x] 過去注文の編集可否判定（`canEditOrderValue`の正しい計算と`CalendarCell`への渡し方修正）
+- [x] `order.order_date`がDateオブジェクトの場合の処理（本番環境とローカル環境の型の違いに対応）
 
 **ステータス**: ✅ **完了**
 
@@ -164,6 +167,7 @@
 - [x] 数量入力
 - [x] 注文確定処理
 - [x] 注文日のバリデーション（過去の日付、締切時刻チェック）
+- [x] 締切時間表示機能（すべての日付で締切時間を表示、注文者が締切時間を確認できるように改善）
 
 ### 注文 API
 
