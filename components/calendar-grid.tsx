@@ -516,6 +516,32 @@ export default function CalendarGrid({
           }
 
           const dateStr = formatDateLocal(date);
+          
+          // #region agent log
+          // 12日、13日、14日のdateStrを確認（formatDateLocalの結果を検証）
+          if (typeof window !== 'undefined' && (
+            date.getDate() === 12 || date.getDate() === 13 || date.getDate() === 14
+          ) && date.getMonth() === 0 && date.getFullYear() === 2026) {
+            const logData = {
+              location:'calendar-grid.tsx:518',
+              message:'Date cell rendering check',
+              data:{
+                dateStr,
+                dateYear:date.getFullYear(),
+                dateMonth:date.getMonth(),
+                dateDate:date.getDate(),
+                dateISO:date.toISOString()
+              },
+              timestamp:Date.now(),
+              sessionId:'debug-session',
+              runId:'run1',
+              hypothesisId:'I'
+            };
+            console.log('[DEBUG]', logData);
+            fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+          }
+          // #endregion
+          
           // オブジェクト型の場合の安全なアクセス
           let orderDay: OrderDay | undefined;
           let order: Order | undefined;
