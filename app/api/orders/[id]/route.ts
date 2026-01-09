@@ -214,6 +214,23 @@ export async function PUT(
 
         const unit_price_snapshot = priceInfoResult.rows[0].price;
 
+        // キャンセル済みの注文がある場合、UNIQUE制約違反を避けるために削除する
+        // 同じユーザー、同じ日付、同じメニューでキャンセル済みの注文を削除
+        const canceledOrdersResult = await client.query(
+          `SELECT id FROM orders 
+           WHERE user_id = $1 AND order_date = $2 
+             AND status = 'canceled' AND menu_item_id = $3 AND id != $4`,
+          [order.user_id, order.order_date, menu_id, orderId]
+        );
+
+        if (canceledOrdersResult.rows.length > 0) {
+          for (const canceledOrder of canceledOrdersResult.rows) {
+            await client.query("DELETE FROM orders WHERE id = $1", [
+              canceledOrder.id,
+            ]);
+          }
+        }
+
         // 注文を更新
         const updateResult = await client.query(
           `UPDATE orders 
