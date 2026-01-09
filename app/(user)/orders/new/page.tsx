@@ -153,9 +153,9 @@ export default async function NewOrderPage({
         <h1 className="text-2xl font-bold text-gray-800">📝 新規注文</h1>
         <p className="text-gray-500 mt-1">
           {orderDateObj.getFullYear()}年{orderDateObj.getMonth() + 1}月{orderDateObj.getDate()}日
-          {isToday && orderDayTyped?.deadline_time && (
-            <span className="ml-2 text-sm text-amber-600">
-              （締切: {orderDayTyped.deadline_time}）
+          {orderDayTyped?.deadline_time && (
+            <span className="ml-2 text-sm text-amber-600 font-medium">
+              （締切時間: {orderDayTyped.deadline_time}）
             </span>
           )}
         </p>
