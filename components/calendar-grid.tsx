@@ -46,45 +46,11 @@ export default function CalendarGrid({
   const todayRef = useRef<Date | null>(null);
   const nowRef = useRef<Date | null>(null);
   
-  // 初期値をlocalStorageから復元（月変更時のちらつき防止）
-  const getInitialToday = (): Date | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const savedToday = localStorage.getItem('calendar_today');
-      if (savedToday) {
-        const savedTodayDate = new Date(savedToday);
-        // 保存された値が今日の日付であれば使用（1日以上古い値は使用しない）
-        const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
-        const savedTodayStr = `${savedTodayDate.getFullYear()}-${String(savedTodayDate.getMonth() + 1).padStart(2, "0")}-${String(savedTodayDate.getDate()).padStart(2, "0")}`;
-        if (savedTodayStr === todayStr) {
-          return savedTodayDate;
-        }
-      }
-    } catch (e) {
-      // localStorageが使用できない場合は無視
-    }
-    return null;
-  };
-
-  const getInitialNow = (): Date | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const savedNow = localStorage.getItem('calendar_now');
-      if (savedNow) {
-        return new Date(savedNow);
-      }
-    } catch (e) {
-      // localStorageが使用できない場合は無視
-    }
-    return null;
-  };
-
-  const initialToday = getInitialToday();
-  const initialNow = getInitialNow();
-  
-  const [today, setToday] = useState<Date | null>(initialToday);
-  const [now, setNow] = useState<Date | null>(initialNow);
-  const [isMounted, setIsMounted] = useState(!!(initialToday && initialNow));
+  // サーバー側とクライアント側で同じ初期値を返す（hydration mismatchを防ぐ）
+  // localStorageからの復元はuseEffectで行う
+  const [today, setToday] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     // #region agent log
