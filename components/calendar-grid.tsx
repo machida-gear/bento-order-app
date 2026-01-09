@@ -590,8 +590,36 @@ export default function CalendarGrid({
             (isAdminMode && !isAvailable);
 
           // #region agent log
-          if (typeof window !== 'undefined' && order && (dateStr === '2026-01-04' || dateStr === '2026-01-05' || dateStr === '2026-01-06' || dateStr === '2026-01-09')) {
-            const logData = {location:'calendar-grid.tsx:426',message:'shouldBeGray calculation (past orders)',data:{dateStr,orderId:order.id,isAvailable,isPastDate,canOrderToday,exceedsMaxDays,canEditOrderValue,shouldBeGray,isAdminMode,orderDate:order.order_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'};
+          // 過去日付と将来日付の両方で、特定の日付のshouldBeGrayとcanEditOrderValueを検証
+          // orderの有無に関わらずログを出力（12日、13日、14日の問題を調査するため）
+          if (typeof window !== 'undefined' && (
+            dateStr === '2026-01-04' || dateStr === '2026-01-05' || dateStr === '2026-01-06' || dateStr === '2026-01-09' ||
+            dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14'
+          )) {
+            const logData = {
+              location:'calendar-grid.tsx:426',
+              message:'shouldBeGray calculation (orders)',
+              data:{
+                dateStr,
+                orderId:order?.id || null,
+                hasOrder:!!order,
+                hasOrderDay:!!orderDay,
+                isAvailable,
+                isPastDate,
+                canOrderToday,
+                exceedsMaxDays,
+                canEditOrderValue,
+                shouldBeGray,
+                isAdminMode,
+                orderDate:order?.order_date || null,
+                orderDayAvailable:orderDay?.is_available ?? null,
+                orderDayDeadlineTime:orderDay?.deadline_time || null
+              },
+              timestamp:Date.now(),
+              sessionId:'debug-session',
+              runId:'run1',
+              hypothesisId:'G'
+            };
             console.log('[DEBUG]', logData);
             fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
           }
