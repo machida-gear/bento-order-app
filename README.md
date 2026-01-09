@@ -42,6 +42,7 @@ Next.js 16.1.1 (App Router) と Supabase を使用した社員向けお弁当注
 
 ### 最新の変更
 
+- **[カレンダーページ過去注文・ちらつき問題修正.md](./docs/カレンダーページ過去注文・ちらつき問題修正.md)** - カレンダーページの過去注文クリック・月変更時のちらつき問題修正（`canEditOrder()`削除、`shouldBeGray`チェック修正、`localStorage`による状態保持）
 - **[カレンダーページ全日付グレーアウト問題修正.md](./docs/カレンダーページ全日付グレーアウト問題修正.md)** - カレンダーページの全日付グレーアウト問題修正（`target_date`フォーマット正規化）
 - **[カレンダーページHydration Mismatchエラー修正.md](./docs/カレンダーページHydration Mismatchエラー修正.md)** - カレンダーページのHydration Mismatchエラー修正（React error #418）
 - **[Next.js16型エラー修正とVercelデプロイ対応.md](./docs/Next.js16型エラー修正とVercelデプロイ対応.md)** - Next.js 16.1.1 の型エラー修正と Vercel デプロイ対応

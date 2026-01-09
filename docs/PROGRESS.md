@@ -141,12 +141,15 @@
 - [x] エラーハンドリングとデバッグログの追加
 - [x] Hydration Mismatchエラー修正（React error #418、サーバー・クライアント間の日付計算の不一致解決）
 - [x] 全日付グレーアウト問題修正（`target_date`フォーマット正規化、`orderDaysMap`キーマッピング修正）
+- [x] 過去注文クリック問題修正（削除済み`canEditOrder()`呼び出し削除、`shouldBeGray`と`canEditOrderValue`の直接チェック）
+- [x] 月変更時の画面ちらつき修正（`localStorage`からの初期値復元、状態保持）
 
 ### 注文可否判定
 
 - [x] 過去の日付の判定
 - [x] 締切時刻の判定
 - [x] 注文可能日の判定
+- [x] 過去注文の編集可否判定（`canEditOrderValue`の正しい計算と`CalendarCell`への渡し方修正）
 
 **ステータス**: ✅ **完了**
 
