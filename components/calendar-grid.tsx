@@ -546,10 +546,29 @@ export default function CalendarGrid({
               canEditOrderValue = true;
             } else {
               // 過去の日付は変更不可
-              const orderDateStr = typeof order.order_date === 'string' 
-                ? order.order_date.split('T')[0].split(' ')[0]
-                : String(order.order_date).split('T')[0].split(' ')[0];
+              // order.order_dateがDateオブジェクトの場合、YYYY-MM-DD形式に変換
+              let orderDateStr: string;
+              if (order.order_date instanceof Date) {
+                // Dateオブジェクトの場合、YYYY-MM-DD形式に変換
+                orderDateStr = `${order.order_date.getFullYear()}-${String(order.order_date.getMonth() + 1).padStart(2, "0")}-${String(order.order_date.getDate()).padStart(2, "0")}`;
+              } else if (typeof order.order_date === 'string') {
+                // 文字列の場合、YYYY-MM-DD形式を抽出
+                orderDateStr = order.order_date.split('T')[0].split(' ')[0];
+              } else {
+                // その他の場合、一度Dateオブジェクトに変換してからYYYY-MM-DD形式に変換
+                const orderDate = new Date(order.order_date);
+                orderDateStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}-${String(orderDate.getDate()).padStart(2, "0")}`;
+              }
+              
               const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+              
+              // #region agent log
+              if (typeof window !== 'undefined' && (dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14')) {
+                const logData = {location:'calendar-grid.tsx:551',message:'orderDateStr calculation',data:{dateStr,orderId:order.id,orderDateType:typeof order.order_date,orderDateIsDate:order.order_date instanceof Date,orderDateOriginal:order.order_date instanceof Date ? order.order_date.toISOString() : String(order.order_date),orderDateStr,todayStr,orderDateStrLessThanToday:orderDateStr < todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'};
+                console.log('[DEBUG]', logData);
+                fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+              }
+              // #endregion
               
               // 過去の日付は変更不可（文字列比較でタイムゾーンの影響を排除）
               if (orderDateStr < todayStr) {
