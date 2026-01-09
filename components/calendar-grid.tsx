@@ -53,11 +53,6 @@ export default function CalendarGrid({
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // #region agent log
-    const logStart = {location:'calendar-grid.tsx:49',message:'useEffect started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-    console.log('[DEBUG]', logStart);
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logStart)}).catch(()=>{});
-    // #endregion
     // クライアント側でのみ実行
     // localStorageから値を復元（月変更時のちらつき防止）
     try {
@@ -78,11 +73,6 @@ export default function CalendarGrid({
           requestAnimationFrame(() => {
             setIsMounted(true);
           });
-          // #region agent log
-          const logRestored = {location:'calendar-grid.tsx:58',message:'useEffect: restored from localStorage',data:{isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-          console.log('[DEBUG]', logRestored);
-          fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logRestored)}).catch(()=>{});
-          // #endregion
           return;
         }
       }
@@ -109,31 +99,14 @@ export default function CalendarGrid({
     } catch (e) {
       // localStorageが使用できない場合は無視
     }
-    
-    // #region agent log
-    const logComplete = {location:'calendar-grid.tsx:76',message:'useEffect completed',data:{isMounted:true,today:currentDate.toISOString(),now:currentNow.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-    console.log('[DEBUG]', logComplete);
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logComplete)}).catch(()=>{});
-    // #endregion
   }, []);
 
   // 年月が変更されたときに、localStorageから値を復元（ちらつき防止）
   // ただし、既にisMountedがtrueの場合は、値を保持する（再マウントされていない場合）
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // #region agent log
-      const logStart = {location:'calendar-grid.tsx:115',message:'useEffect: year/month changed',data:{year,month,isMounted,hasToday:!!today,hasNow:!!now},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
-      console.log('[DEBUG]', logStart);
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logStart)}).catch(()=>{});
-      // #endregion
-      
       // 既にisMountedがtrueで、todayとnowが設定されている場合は、値を保持（再マウントされていない）
       if (isMounted && today && now) {
-        // #region agent log
-        const logKept = {location:'calendar-grid.tsx:120',message:'useEffect: keeping existing values (not remounted)',data:{year,month,isMounted,today:today.toISOString(),now:now.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
-        console.log('[DEBUG]', logKept);
-        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logKept)}).catch(()=>{});
-        // #endregion
         return;
       }
       
@@ -156,11 +129,6 @@ export default function CalendarGrid({
             requestAnimationFrame(() => {
               setIsMounted(true);
             });
-            // #region agent log
-            const logRestored = {location:'calendar-grid.tsx:140',message:'useEffect: restored from localStorage (year/month changed)',data:{year,month,isMounted:true,today:savedTodayDate.toISOString(),now:savedNowDate.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
-            console.log('[DEBUG]', logRestored);
-            fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logRestored)}).catch(()=>{});
-            // #endregion
             return;
           }
         }
@@ -187,12 +155,6 @@ export default function CalendarGrid({
       } catch (e) {
         // localStorageが使用できない場合は無視
       }
-      
-      // #region agent log
-      const logCreated = {location:'calendar-grid.tsx:165',message:'useEffect: created new values (year/month changed)',data:{year,month,isMounted:true,today:currentDate.toISOString(),now:currentNow.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'};
-      console.log('[DEBUG]', logCreated);
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logCreated)}).catch(()=>{});
-      // #endregion
     }
   }, [year, month, isMounted, today, now]);
 
@@ -220,20 +182,10 @@ export default function CalendarGrid({
     }
   }, [year, month, orderDaysMap, ordersMap]);
 
-  // #region agent log
-  if (typeof window !== 'undefined') {
-    const logData = {location:'calendar-grid.tsx:82',message:'Mounted state check',data:{isMounted,hasToday:!!today,hasNow:!!now,todayValue:today?.toISOString(),nowValue:now?.toISOString(),year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-    console.log('[DEBUG]', logData);
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-  }
-  // #endregion
   // サーバー側レンダリング時のみ空の状態を返す（hydration mismatchを防ぐ）
   // クライアント側では、isMountedがtrueの場合、年月が変わっても空のカレンダーを表示しない（ちらつき防止）
   // サーバー側（typeof window === 'undefined'）の場合のみ空のカレンダーを表示
   if (typeof window === 'undefined') {
-    // #region agent log
-    // サーバー側ではログを送信しない（fetchが利用できない）
-    // #endregion
     // サーバー側でのみ空のカレンダーを表示
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
@@ -266,13 +218,6 @@ export default function CalendarGrid({
   const effectiveNow = now || nowRef.current;
   
   if (!isMounted || !effectiveToday || !effectiveNow) {
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      const logData = {location:'calendar-grid.tsx:131',message:'Returning empty calendar (client not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      console.log('[DEBUG]', logData);
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-    }
-    // #endregion
     // 初回マウント前のみ空のカレンダーを表示
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
@@ -300,13 +245,6 @@ export default function CalendarGrid({
 
   // クライアント側で初回マウント前の場合のみ空のカレンダーを表示
   if (!isMounted || !today || !now) {
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      const logData = {location:'calendar-grid.tsx:131',message:'Returning empty calendar (client not mounted)',data:{isMounted,hasToday:!!today,hasNow:!!now,year,month},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      console.log('[DEBUG]', logData);
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-    }
-    // #endregion
     // 初回マウント前のみ空のカレンダーを表示
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-3 md:p-2">
@@ -338,14 +276,6 @@ export default function CalendarGrid({
   const todayMonth = effectiveToday!.getMonth();
   const todayDate = effectiveToday!.getDate();
   
-  // #region agent log
-  if (typeof window !== 'undefined') {
-    const orderDaysMapKeys = orderDaysMap instanceof Map ? [] : Object.keys(orderDaysMap || {});
-    const logData = {location:'calendar-grid.tsx:107',message:'Calendar rendered (mounted)',data:{year,month,todayYear:effectiveToday!.getFullYear(),todayMonth:effectiveToday!.getMonth(),todayDate:effectiveToday!.getDate(),orderDaysMapKeysCount:orderDaysMapKeys.length,orderDaysMapSample:orderDaysMapKeys.slice(0,5),maxOrderDaysAhead,isAdminMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-    console.log('[DEBUG]', logData);
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-  }
-  // #endregion
 
   // ローカルタイムゾーンで日付文字列を取得（YYYY-MM-DD形式）
   const formatDateLocal = (date: Date): string => {
@@ -389,49 +319,21 @@ export default function CalendarGrid({
     const dateStr = formatDateLocal(date);
     // 管理者モードの場合は注文可能日チェックをスキップ（過去の日付も選択可能）
     if (isAdminMode) {
-      // #region agent log
-      if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-        const logData = {location:'calendar-grid.tsx:151',message:'canOrder: admin mode, returning true',data:{dateStr,isAdminMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        console.log('[DEBUG]', logData);
-        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-      }
-      // #endregion
       return true;
     }
 
     if (!orderDay?.is_available) {
-      // #region agent log
-      if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-        const logData = {location:'calendar-grid.tsx:157',message:'canOrder: orderDay not available',data:{dateStr,hasOrderDay:!!orderDay,isAvailable:orderDay?.is_available},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        console.log('[DEBUG]', logData);
-        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-      }
-      // #endregion
       return false;
     }
 
     // 過去の日付は注文不可
     if (isPast(date)) {
-      // #region agent log
-      if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-        const logData = {location:'calendar-grid.tsx:161',message:'canOrder: date is past',data:{dateStr,isPastDate:isPast(date)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        console.log('[DEBUG]', logData);
-        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-      }
-      // #endregion
       return false;
     }
 
     // 最大注文可能日数を超えている場合は注文不可
     const daysAhead = getDaysAhead(date);
     if (daysAhead > maxOrderDaysAhead) {
-      // #region agent log
-      if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-        const logData = {location:'calendar-grid.tsx:165',message:'canOrder: exceeds max days',data:{dateStr,daysAhead,maxOrderDaysAhead},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        console.log('[DEBUG]', logData);
-        fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-      }
-      // #endregion
       return false;
     }
 
@@ -442,24 +344,10 @@ export default function CalendarGrid({
       deadline.setHours(hours, minutes, 0, 0);
 
       if (effectiveNow! >= deadline) {
-        // #region agent log
-        if (typeof window !== 'undefined') {
-          const logData = {location:'calendar-grid.tsx:174',message:'canOrder: deadline passed',data:{dateStr,now:effectiveNow!.toISOString(),deadline:deadline.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-          console.log('[DEBUG]', logData);
-          fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-        }
-        // #endregion
         return false;
       }
     }
 
-    // #region agent log
-    if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-      const logData = {location:'calendar-grid.tsx:181',message:'canOrder: returning true',data:{dateStr,isAvailable:orderDay?.is_available,daysAhead,maxOrderDaysAhead},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-      console.log('[DEBUG]', logData);
-      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-    }
-    // #endregion
     return true;
   };
 
@@ -525,31 +413,6 @@ export default function CalendarGrid({
 
           const dateStr = formatDateLocal(date);
           
-          // #region agent log
-          // 12日、13日、14日のdateStrを確認（formatDateLocalの結果を検証）
-          if (typeof window !== 'undefined' && (
-            date.getDate() === 12 || date.getDate() === 13 || date.getDate() === 14
-          ) && date.getMonth() === 0 && date.getFullYear() === 2026) {
-            const logData = {
-              location:'calendar-grid.tsx:518',
-              message:'Date cell rendering check',
-              data:{
-                dateStr,
-                dateYear:date.getFullYear(),
-                dateMonth:date.getMonth(),
-                dateDate:date.getDate(),
-                dateISO:date.toISOString()
-              },
-              timestamp:Date.now(),
-              sessionId:'debug-session',
-              runId:'run1',
-              hypothesisId:'I'
-            };
-            console.log('[DEBUG]', logData);
-            fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-          }
-          // #endregion
-          
           // オブジェクト型の場合の安全なアクセス
           let orderDay: OrderDay | undefined;
           let order: Order | undefined;
@@ -606,17 +469,6 @@ export default function CalendarGrid({
               
               const todayStr = `${effectiveToday!.getFullYear()}-${String(effectiveToday!.getMonth() + 1).padStart(2, "0")}-${String(effectiveToday!.getDate()).padStart(2, "0")}`;
               
-              // #region agent log
-              if (typeof window !== 'undefined' && (dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14')) {
-                const orderDateValueForLog = order.order_date as string | Date;
-                const orderDateIsDate = orderDateValueForLog instanceof Date;
-                const orderDateOriginal = orderDateIsDate ? orderDateValueForLog.toISOString() : String(orderDateValueForLog);
-                const logData = {location:'calendar-grid.tsx:551',message:'orderDateStr calculation',data:{dateStr,orderId:order.id,orderDateType:typeof order.order_date,orderDateIsDate,orderDateOriginal,orderDateStr,todayStr,orderDateStrLessThanToday:orderDateStr < todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'};
-                console.log('[DEBUG]', logData);
-                fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-              }
-              // #endregion
-              
               // 過去の日付は変更不可（文字列比較でタイムゾーンの影響を排除）
               if (orderDateStr < todayStr) {
                 canEditOrderValue = false;
@@ -647,49 +499,7 @@ export default function CalendarGrid({
             ) ||
             (isAdminMode && !isAvailable);
 
-          // #region agent log
-          // 過去日付と将来日付の両方で、特定の日付のshouldBeGrayとcanEditOrderValueを検証
-          // orderの有無に関わらずログを出力（12日、13日、14日の問題を調査するため）
-          if (typeof window !== 'undefined' && (
-            dateStr === '2026-01-04' || dateStr === '2026-01-05' || dateStr === '2026-01-06' || dateStr === '2026-01-09' ||
-            dateStr === '2026-01-12' || dateStr === '2026-01-13' || dateStr === '2026-01-14'
-          )) {
-            const logData = {
-              location:'calendar-grid.tsx:426',
-              message:'shouldBeGray calculation (orders)',
-              data:{
-                dateStr,
-                orderId:order?.id || null,
-                hasOrder:!!order,
-                hasOrderDay:!!orderDay,
-                isAvailable,
-                isPastDate,
-                canOrderToday,
-                exceedsMaxDays,
-                canEditOrderValue,
-                shouldBeGray,
-                isAdminMode,
-                orderDate:order?.order_date || null,
-                orderDayAvailable:orderDay?.is_available ?? null,
-                orderDayDeadlineTime:orderDay?.deadline_time || null
-              },
-              timestamp:Date.now(),
-              sessionId:'debug-session',
-              runId:'run1',
-              hypothesisId:'G'
-            };
-            console.log('[DEBUG]', logData);
-            fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-          }
-          // #endregion
 
-          // #region agent log
-          if (typeof window !== 'undefined' && (dateStr === '2026-01-17' || dateStr === '2026-01-18' || dateStr === '2026-01-16')) {
-            const logData = {location:'calendar-grid.tsx:234',message:'Date evaluation (sample dates)',data:{dateStr,isAvailable,isTodayDay,canOrderToday,isPastDate,daysAhead,exceedsMaxDays,shouldBeGray,isAdminMode,hasOrderDay:!!orderDay,hasOrder:!!order,maxOrderDaysAhead},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-            console.log('[DEBUG]', logData);
-            fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-          }
-          // #endregion
 
           return (
             <div
