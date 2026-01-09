@@ -547,16 +547,18 @@ export default function CalendarGrid({
             } else {
               // 過去の日付は変更不可
               // order.order_dateがDateオブジェクトの場合、YYYY-MM-DD形式に変換
+              // 型定義ではstringだが、実行時にはDateオブジェクトの可能性があるため、型アサーションを使用
               let orderDateStr: string;
-              if (order.order_date instanceof Date) {
+              const orderDateValue = order.order_date as string | Date;
+              if (orderDateValue instanceof Date) {
                 // Dateオブジェクトの場合、YYYY-MM-DD形式に変換
-                orderDateStr = `${order.order_date.getFullYear()}-${String(order.order_date.getMonth() + 1).padStart(2, "0")}-${String(order.order_date.getDate()).padStart(2, "0")}`;
-              } else if (typeof order.order_date === 'string') {
+                orderDateStr = `${orderDateValue.getFullYear()}-${String(orderDateValue.getMonth() + 1).padStart(2, "0")}-${String(orderDateValue.getDate()).padStart(2, "0")}`;
+              } else if (typeof orderDateValue === 'string') {
                 // 文字列の場合、YYYY-MM-DD形式を抽出
-                orderDateStr = order.order_date.split('T')[0].split(' ')[0];
+                orderDateStr = orderDateValue.split('T')[0].split(' ')[0];
               } else {
                 // その他の場合、一度Dateオブジェクトに変換してからYYYY-MM-DD形式に変換
-                const orderDate = new Date(order.order_date);
+                const orderDate = new Date(orderDateValue);
                 orderDateStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}-${String(orderDate.getDate()).padStart(2, "0")}`;
               }
               
