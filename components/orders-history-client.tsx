@@ -34,18 +34,20 @@ type ClosingPeriod = {
 interface OrdersHistoryClientProps {
   orders: Order[]
   orderDays: OrderDay[]
-  currentPeriod: ClosingPeriod | null
-  nextPeriod: ClosingPeriod | null
-  selectedPeriod: 'current' | 'next'
+  previousPeriod: ClosingPeriod
+  currentPeriod: ClosingPeriod
+  nextPeriod: ClosingPeriod
+  selectedPeriod: 'previous' | 'current' | 'next'
 }
 
 /**
  * 注文履歴クライアントコンポーネント
- * 締日期間による注文表示と「今月」「来月」の切り替え機能
+ * 締日期間による注文表示と「先月」「今月」「来月」の切り替え機能
  */
 export default function OrdersHistoryClient({
   orders,
   orderDays,
+  previousPeriod,
   currentPeriod,
   nextPeriod,
   selectedPeriod,
@@ -53,14 +55,28 @@ export default function OrdersHistoryClient({
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // 選択された期間に基づいて期間データを取得
+  const getSelectedPeriodData = (): ClosingPeriod => {
+    switch (selectedPeriod) {
+      case 'previous':
+        return previousPeriod
+      case 'next':
+        return nextPeriod
+      default:
+        return currentPeriod
+    }
+  }
+
+  const selectedPeriodData = getSelectedPeriodData()
+
   // 選択された期間に基づいて注文をフィルタリング
-  const selectedPeriodData = selectedPeriod === 'current' ? currentPeriod : nextPeriod
-  const filteredOrders = selectedPeriodData
-    ? orders.filter((order) => {
-        const orderDate = order.order_date
-        return orderDate >= selectedPeriodData.start_date && orderDate <= selectedPeriodData.end_date
-      })
-    : []
+  const filteredOrders = orders.filter((order) => {
+    const orderDate = order.order_date
+    return (
+      orderDate >= selectedPeriodData.start_date &&
+      orderDate <= selectedPeriodData.end_date
+    )
+  })
 
   // 日付をキーとしたマップを作成
   const orderDaysMap = new Map(orderDays.map((day) => [day.target_date, day]))
@@ -74,18 +90,18 @@ export default function OrdersHistoryClient({
     const now = new Date()
     const jstOffset = 9 * 60 * 60 * 1000 // JSTはUTC+9
     const jstNow = new Date(now.getTime() + jstOffset)
-    
+
     // 今日の日付をJSTで取得（YYYY-MM-DD形式）
     const year = jstNow.getUTCFullYear()
     const month = String(jstNow.getUTCMonth() + 1).padStart(2, '0')
     const day = String(jstNow.getUTCDate()).padStart(2, '0')
     const todayJSTStr = `${year}-${month}-${day}`
-    
+
     // 過去の日付は締切時間を過ぎている
     if (orderDate < todayJSTStr) {
       return true
     }
-    
+
     if (!deadlineTime) {
       return false
     }
@@ -97,7 +113,7 @@ export default function OrdersHistoryClient({
       let utcDate = jstNow.getUTCDate()
       let utcMonth = jstNow.getUTCMonth()
       let utcYear = year
-      
+
       // 時刻が負の場合は前日に繰り下げ
       if (utcHours < 0) {
         utcHours += 24
@@ -111,8 +127,10 @@ export default function OrdersHistoryClient({
           utcDate = new Date(utcYear, utcMonth + 1, 0).getDate()
         }
       }
-      
-      const deadlineUTC = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHours, minutes, 0))
+
+      const deadlineUTC = new Date(
+        Date.UTC(utcYear, utcMonth, utcDate, utcHours, minutes, 0)
+      )
       return now >= deadlineUTC
     }
 
@@ -128,10 +146,27 @@ export default function OrdersHistoryClient({
   }, 0)
 
   // 期間切り替え
-  const handlePeriodChange = (period: 'current' | 'next') => {
+  const handlePeriodChange = (period: 'previous' | 'current' | 'next') => {
     const params = new URLSearchParams(searchParams.toString())
-    params.set('period', period)
-    router.push(`/orders?${params.toString()}`)
+    if (period === 'current') {
+      params.delete('period')
+    } else {
+      params.set('period', period)
+    }
+    const queryString = params.toString()
+    router.push(`/orders${queryString ? `?${queryString}` : ''}`)
+  }
+
+  // 期間のラベルを取得
+  const getPeriodLabel = (): string => {
+    switch (selectedPeriod) {
+      case 'previous':
+        return '先月'
+      case 'next':
+        return '来月'
+      default:
+        return '今月'
+    }
   }
 
   return (
@@ -141,6 +176,19 @@ export default function OrdersHistoryClient({
         <div>
           <h1 className="text-2xl font-bold text-gray-800">📋 注文履歴</h1>
           <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => handlePeriodChange('previous')}
+              className={`
+                px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${
+                  selectedPeriod === 'previous'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }
+              `}
+            >
+              先月
+            </button>
             <button
               onClick={() => handlePeriodChange('current')}
               className={`
@@ -154,30 +202,24 @@ export default function OrdersHistoryClient({
             >
               今月
             </button>
-            {nextPeriod && (
-              <button
-                onClick={() => handlePeriodChange('next')}
-                className={`
-                  px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-                  ${
-                    selectedPeriod === 'next'
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }
-                `}
-              >
-                来月
-              </button>
-            )}
+            <button
+              onClick={() => handlePeriodChange('next')}
+              className={`
+                px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${
+                  selectedPeriod === 'next'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }
+              `}
+            >
+              来月
+            </button>
           </div>
-          {selectedPeriodData && (
-            <p className="text-gray-500 mt-2 text-sm">{selectedPeriodData.label}</p>
-          )}
+          <p className="text-gray-500 mt-2 text-sm">{selectedPeriodData.label}</p>
         </div>
         <div className="text-right">
-          <div className="text-sm text-gray-500">
-            {selectedPeriod === 'current' ? '今月' : '来月'}の合計
-          </div>
+          <div className="text-sm text-gray-500">{getPeriodLabel()}の合計</div>
           <div className="text-2xl font-bold text-amber-600">
             ¥{totalAmount.toLocaleString()}
           </div>
@@ -189,7 +231,9 @@ export default function OrdersHistoryClient({
         {filteredOrders && filteredOrders.length > 0 ? (
           filteredOrders.map((order) => {
             const date = new Date(order.order_date)
-            const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()]
+            const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][
+              date.getDay()
+            ]
 
             return (
               <div
@@ -219,7 +263,10 @@ export default function OrdersHistoryClient({
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-gray-800">
-                      ¥{((order.unit_price_snapshot || 0) * order.quantity).toLocaleString()}
+                      ¥
+                      {(
+                        (order.unit_price_snapshot || 0) * order.quantity
+                      ).toLocaleString()}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       {order.status === 'canceled' ? (
