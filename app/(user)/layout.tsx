@@ -57,7 +57,7 @@ export default async function UserLayout({
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
       <UserNav profile={profile as any} />
-      <main className="container mx-auto px-4 pt-0 pb-2 max-w-4xl">
+      <main className="container mx-auto px-4 pt-0 pb-24 max-w-4xl">
         {children}
       </main>
     </div>
