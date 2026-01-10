@@ -187,6 +187,7 @@
 - [x] キャンセル機能
 - [x] キャンセル API（`app/api/orders/[id]/route.ts`）
 - [x] Transaction connection (6543)対応（パフォーマンス向上）
+- [x] フッターメニュー重なり問題修正（レイアウトの下部余白を`pb-2`から`pb-24`に変更）
 
 ### 注文変更機能
 
