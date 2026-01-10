@@ -42,12 +42,14 @@ Next.js 16.1.1 (App Router) と Supabase を使用した社員向けお弁当注
 
 ### 最新の変更
 
-- **[カレンダーページリサイズ問題修正.md](./docs/カレンダーページリサイズ問題修正.md)** - カレンダーページのリサイズ問題修正（空のカレンダーにpadding追加、`requestAnimationFrame`で`isMounted`更新を遅延）
-- **[カレンダーページ13日セル表示問題修正.md](./docs/カレンダーページ13日セル表示問題修正.md)** - カレンダーページの13日セル表示問題修正（`order.order_date`がDateオブジェクトの場合の処理追加、Hydration Mismatch再発修正）
+- **[注文更新時の制約違反エラー修正.md](./docs/注文更新時の制約違反エラー修正.md)** - 注文更新時の`unique_order_per_day`制約違反エラー修正（キャンセル済み注文の削除処理を追加）
+- **[カレンダーページリサイズ問題修正.md](./docs/カレンダーページリサイズ問題修正.md)** - カレンダーページのリサイズ問題修正（空のカレンダーに padding 追加、`requestAnimationFrame`で`isMounted`更新を遅延）
+- **[新規注文画面に締切時間表示機能追加](./docs/CHANGELOG.md#2026-01-xx新規注文画面に締切時間表示機能追加)** - 新規注文画面にすべての日付で締切時間を表示する機能を追加
+- **[カレンダーページ 13 日セル表示問題修正.md](./docs/カレンダーページ13日セル表示問題修正.md)** - カレンダーページの 13 日セル表示問題修正（`order.order_date`が Date オブジェクトの場合の処理追加、Hydration Mismatch 再発修正）
 - **[カレンダーページ過去注文・ちらつき問題修正.md](./docs/カレンダーページ過去注文・ちらつき問題修正.md)** - カレンダーページの過去注文クリック・月変更時のちらつき問題修正（`canEditOrder()`削除、`shouldBeGray`チェック修正、`localStorage`による状態保持）
 - **[カレンダーページ全日付グレーアウト問題修正.md](./docs/カレンダーページ全日付グレーアウト問題修正.md)** - カレンダーページの全日付グレーアウト問題修正（`target_date`フォーマット正規化）
-- **[カレンダーページHydration Mismatchエラー修正.md](./docs/カレンダーページHydration Mismatchエラー修正.md)** - カレンダーページのHydration Mismatchエラー修正（React error #418）
-- **[Next.js16型エラー修正とVercelデプロイ対応.md](./docs/Next.js16型エラー修正とVercelデプロイ対応.md)** - Next.js 16.1.1 の型エラー修正と Vercel デプロイ対応
+- **[カレンダーページ Hydration Mismatch エラー修正.md](./docs/カレンダーページ Hydration Mismatch エラー修正.md)** - カレンダーページの Hydration Mismatch エラー修正（React error #418）
+- **[Next.js16 型エラー修正と Vercel デプロイ対応.md](./docs/Next.js16型エラー修正とVercelデプロイ対応.md)** - Next.js 16.1.1 の型エラー修正と Vercel デプロイ対応
 
 ---
 

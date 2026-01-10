@@ -202,9 +202,7 @@ Authユーザー削除時に監査ログを保持したまま削除可能にす�
 - `045_check_and_fix_orders_rls.sql` - orders RLSポリシーの確認・修正
 - `048_create_order_calendar_admin_policy.sql` - order_calendar 管理者ポリシー作成
 
-### 関数・ENUM型の修正
-
-- `038_fix_get_menu_price_id_function.sql` - `get_menu_price_id` 関数の修正
+### 関数・ENUM型の修正- `038_fix_get_menu_price_id_function.sql` - `get_menu_price_id` 関数の修正
 - `046_check_order_status_enum.sql` - order_status ENUM型の確認
 - `047_add_cancelled_to_order_status_enum.sql` - order_status ENUM型に値を追加（未使用）
 
