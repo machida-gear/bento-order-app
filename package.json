@@ -8,6 +8,7 @@
     "kill-nextjs": "node scripts/kill-nextjs.js",
     "kill-nextjs:ps1": "powershell -ExecutionPolicy Bypass -File scripts/kill-nextjs.ps1",
     "kill-nextjs:safe": "powershell -ExecutionPolicy Bypass -File scripts/kill-nextjs-safe.ps1",
+    "kill-nextjs:quiet": "powershell -ExecutionPolicy Bypass -File scripts/kill-nextjs-quiet.ps1",
     "predev": "node scripts/copy-fonts.js",
     "dev": "next dev --webpack",
     "build": "next build",

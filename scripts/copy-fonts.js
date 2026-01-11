@@ -1,6 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 
+// ロックファイルを削除（存在する場合）
+const lockFile = path.join(__dirname, '..', '.next', 'dev', 'lock');
+if (fs.existsSync(lockFile)) {
+  try {
+    fs.unlinkSync(lockFile);
+    console.log('Lock file removed');
+  } catch (error) {
+    // ロックファイルが使用中の場合は無視
+  }
+}
+
 // pdfkitのフォントファイルを.nextフォルダにコピー
 const sourceDir = path.join(__dirname, '..', 'node_modules', 'pdfkit', 'js', 'data');
 const targetDir = path.join(__dirname, '..', '.next', 'dev', 'server', 'vendor-chunks', 'data');

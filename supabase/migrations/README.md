@@ -192,9 +192,7 @@ Authユーザー削除時に監査ログを保持したまま削除可能にす�
 - `007_create_missing_tables_production.sql` - 本番環境用テーブル作成
 - `050_allow_null_deadline_time.sql` - `deadline_time` を NULL 許可に変更
 - `052_allow_null_closing_day_for_month_end.sql` - `closing_day` を NULL 許可に変更（月末締め対応）
-- `058_split_company_address_to_two_columns.sql` - 住所を2行に分割
-
-### RLSポリシー関連
+- `058_split_company_address_to_two_columns.sql` - 住所を2行に分割### RLSポリシー関連
 
 - `012_check_and_fix_profiles_policies.sql` - profiles RLSポリシーの確認・修正
 - `033_create_menu_items_select_policy.sql` - menu_items RLSポリシー作成

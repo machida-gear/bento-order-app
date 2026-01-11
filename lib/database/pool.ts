@@ -6,17 +6,21 @@
  */
 
 import { Pool } from 'pg';
-import { getDatabaseUrl } from '@/lib/utils/database';
+import { getDatabaseUrlOptional } from '@/lib/utils/database';
 
 let pool: Pool | null = null;
 
 /**
  * PostgreSQL接続プールを取得（シングルトン）
  * Transaction connection (6543)を使用
+ * DATABASE_URLが設定されていない場合はnullを返す
  */
-export function getDatabasePool(): Pool {
+export function getDatabasePool(): Pool | null {
   if (!pool) {
-    const databaseUrl = getDatabaseUrl();
+    const databaseUrl = getDatabaseUrlOptional();
+    if (!databaseUrl) {
+      return null;
+    }
     
     // DATABASE_URLがTransaction connection (6543)を使用していることを確認
     // 形式: postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true

@@ -90,17 +90,21 @@ export default function AdminReportsPage() {
     }
   }
 
-  // 締日期間を計算する関数
-  const calculateClosingPeriods = (closingDay: number | null, monthsCount: number): CalculatedPeriod[] => {
+  // 締日期間を計算する関数（来月1ヶ月 + 過去12ヶ月）
+  const calculateClosingPeriods = (closingDay: number | null, pastMonthsCount: number): CalculatedPeriod[] => {
     const periods: CalculatedPeriod[] = []
     const today = new Date()
     
-    for (let i = 0; i < monthsCount; i++) {
-      // 現在からiヶ月前の月を計算
-      const targetMonth = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const year = targetMonth.getFullYear()
-      const month = targetMonth.getMonth() // 0-11
-      
+    // YYYY-MM-DD形式に変換
+    const formatDate = (date: Date): string => {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, '0')
+      const d = String(date.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    
+    // 単一期間を計算する関数
+    const calculateSinglePeriod = (year: number, month: number): CalculatedPeriod => {
       // 前月の情報
       const prevMonth = new Date(year, month, 0) // 前月の最終日
       const prevYear = prevMonth.getFullYear()
@@ -111,43 +115,41 @@ export default function AdminReportsPage() {
       
       if (closingDay === null) {
         // 月末締めの場合
-        // 開始日：前月の最終日の次の日（=当月の1日）
         startDate = new Date(year, month, 1)
-        // 終了日：当月の最終日
         endDate = new Date(year, month + 1, 0)
       } else {
         // 指定日締めの場合
-        // 開始日：前月の締日+1日
         startDate = new Date(prevYear, prevMonthIndex, closingDay + 1)
-        // 終了日：当月の締日
         endDate = new Date(year, month, closingDay)
         
         // 日付が有効でない場合（例：2月31日など）は月末にする
         if (endDate.getMonth() !== month) {
-          endDate = new Date(year, month + 1, 0) // 当月の最終日
+          endDate = new Date(year, month + 1, 0)
         }
-      }
-      
-      // YYYY-MM-DD形式に変換
-      const formatDate = (date: Date): string => {
-        const y = date.getFullYear()
-        const m = String(date.getMonth() + 1).padStart(2, '0')
-        const d = String(date.getDate()).padStart(2, '0')
-        return `${y}-${m}-${d}`
       }
       
       const startDateStr = formatDate(startDate)
       const endDateStr = formatDate(endDate)
       
-      // ラベルを生成（例：2025年12月11日 ～ 2026年1月10日）
+      // ラベルを生成（例：2025年12月11日～2026年1月10日）
       const startLabel = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`
       const endLabel = `${endDate.getFullYear()}年${endDate.getMonth() + 1}月${endDate.getDate()}日`
       
-      periods.push({
+      return {
         start_date: startDateStr,
         end_date: endDateStr,
-        label: `${startLabel} ～ ${endLabel}`,
-      })
+        label: `${startLabel}～${endLabel}`,
+      }
+    }
+    
+    // 来月の期間を追加
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+    periods.push(calculateSinglePeriod(nextMonth.getFullYear(), nextMonth.getMonth()))
+    
+    // 今月から過去12ヶ月分を追加
+    for (let i = 0; i <= pastMonthsCount; i++) {
+      const targetMonth = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      periods.push(calculateSinglePeriod(targetMonth.getFullYear(), targetMonth.getMonth()))
     }
     
     return periods
@@ -337,7 +339,7 @@ export default function AdminReportsPage() {
                 key={index}
                 value={`${period.start_date}_${period.end_date}`}
               >
-                {period.label} ({period.start_date} ～ {period.end_date})
+                {period.label}
               </option>
             ))}
           </select>
@@ -415,7 +417,7 @@ export default function AdminReportsPage() {
           </div>
 
           <div className="mb-4 text-sm text-gray-600">
-            {selectedPeriod.label}: {selectedPeriod.start_date} ～ {selectedPeriod.end_date}
+            {selectedPeriod.label}
           </div>
 
           {loadingSummary ? (

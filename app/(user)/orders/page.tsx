@@ -92,7 +92,7 @@ export default async function OrdersPage({
   const selectedPeriod = (
     params.period === "next"
       ? "next"
-      : params.period === "previous"
+      : params.period === "previous" || params.period === "last"
         ? "previous"
         : "current"
   ) as "previous" | "current" | "next";
@@ -124,7 +124,10 @@ export default async function OrdersPage({
 
   // 今日が今月の期間に含まれているか確認
   // 含まれていない場合は、前月または翌月の期間を今月として使用
-  if (todayStr < currentPeriod.start_date) {
+  const beforeCheck = todayStr < currentPeriod.start_date;
+  const afterCheck = todayStr > currentPeriod.end_date;
+
+  if (beforeCheck) {
     // 今日が期間より前の場合、前月の期間を使用
     const prevDate = new Date(currentYear, currentMonth - 1, 1);
     currentPeriod = calculateSingleClosingPeriod(
@@ -132,7 +135,7 @@ export default async function OrdersPage({
       prevDate.getFullYear(),
       prevDate.getMonth()
     );
-  } else if (todayStr > currentPeriod.end_date) {
+  } else if (afterCheck) {
     // 今日が期間より後の場合、翌月の期間を使用
     const nextDate = new Date(currentYear, currentMonth + 1, 1);
     currentPeriod = calculateSingleClosingPeriod(
@@ -143,30 +146,35 @@ export default async function OrdersPage({
   }
 
   // 現在の期間から先月・来月の期間を計算
-  const currentStartDate = new Date(currentPeriod.start_date);
+  // currentPeriod.end_dateから年と月を抽出（例："2026-01-10" -> year=2026, month=0）
+  // calculateSingleClosingPeriodは「その月を終了月とする期間」を計算するため、終了月を基準にする
+  const [currentEndYear, currentEndMonth] = currentPeriod.end_date.split('-').map(Number);
+  const currentPeriodEndMonth = currentEndMonth - 1; // 0-11に変換
 
-  // 先月の期間を計算
-  const prevMonthDate = new Date(
-    currentStartDate.getFullYear(),
-    currentStartDate.getMonth() - 1,
-    1
-  );
+  // 先月の期間を計算（現在の期間の終了月から1ヶ月前）
+  let prevMonth = currentPeriodEndMonth - 1;
+  let prevYear = currentEndYear;
+  if (prevMonth < 0) {
+    prevMonth = 11;
+    prevYear -= 1;
+  }
   const previousPeriod = calculateSingleClosingPeriod(
     closingDay,
-    prevMonthDate.getFullYear(),
-    prevMonthDate.getMonth()
+    prevYear,
+    prevMonth
   );
 
-  // 来月の期間を計算
-  const nextMonthDate = new Date(
-    currentStartDate.getFullYear(),
-    currentStartDate.getMonth() + 1,
-    1
-  );
+  // 来月の期間を計算（現在の期間の終了月から1ヶ月後）
+  let nextMonth = currentPeriodEndMonth + 1;
+  let nextYear = currentEndYear;
+  if (nextMonth > 11) {
+    nextMonth = 0;
+    nextYear += 1;
+  }
   const nextPeriod = calculateSingleClosingPeriod(
     closingDay,
-    nextMonthDate.getFullYear(),
-    nextMonthDate.getMonth()
+    nextYear,
+    nextMonth
   );
 
   // 取得する期間の範囲を決定（先月から来月までの全期間）

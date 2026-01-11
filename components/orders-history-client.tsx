@@ -69,9 +69,31 @@ export default function OrdersHistoryClient({
 
   const selectedPeriodData = getSelectedPeriodData()
 
+  // order_dateをYYYY-MM-DD形式に変換する関数
+  const formatOrderDate = (orderDate: string | Date): string => {
+    // Dateオブジェクトの場合
+    if (orderDate instanceof Date) {
+      const y = orderDate.getFullYear();
+      const m = String(orderDate.getMonth() + 1).padStart(2, '0');
+      const d = String(orderDate.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    // 文字列の場合
+    if (typeof orderDate === 'string') {
+      // ISO形式（"2026-01-15T15:00:00.000Z"）の場合、最初の10文字を取得
+      if (orderDate.includes('T')) {
+        return orderDate.split('T')[0];
+      }
+      // すでにYYYY-MM-DD形式の場合はそのまま返す
+      return orderDate;
+    }
+    // その他の場合は空文字を返す
+    return '';
+  };
+
   // 選択された期間に基づいて注文をフィルタリング
   const filteredOrders = orders.filter((order) => {
-    const orderDate = order.order_date
+    const orderDate = formatOrderDate(order.order_date);
     return (
       orderDate >= selectedPeriodData.start_date &&
       orderDate <= selectedPeriodData.end_date

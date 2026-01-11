@@ -82,6 +82,7 @@
 | [カレンダーページ13日セル表示問題修正.md](./カレンダーページ13日セル表示問題修正.md) | カレンダーページの13日セル表示問題修正（`order.order_date`がDateオブジェクトの場合の処理追加、Hydration Mismatch再発修正） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 | [カレンダーページリサイズ問題修正.md](./カレンダーページリサイズ問題修正.md) | カレンダーページのリサイズ問題修正（空のカレンダーにpadding追加、`requestAnimationFrame`で`isMounted`更新を遅延） | CHANGELOG.md, PROGRESS.md, SPEC.md |
 | [注文更新時の制約違反エラー修正.md](./注文更新時の制約違反エラー修正.md) | 注文更新時の`unique_order_per_day`制約違反エラー修正（キャンセル済み注文の削除処理を追加） | CHANGELOG.md, PROGRESS.md, SPEC.md, 注文機能の実装と問題解決.md |
+|| [注文履歴締日期間表示とロックファイル問題修正.md](./注文履歴締日期間表示とロックファイル問題修正.md) | 注文履歴ページの締日期間表示機能、開発環境のロックファイル問題修正、DATABASE_URL環境変数設定 | CHANGELOG.md, PROGRESS.md, 環境変数設定手順.md |
 
 ### 運用・設定ドキュメント
 
@@ -199,4 +200,4 @@ docs/TODO.md
 
 ---
 
-最終更新日: 2026-01-XX（注文更新時の制約違反エラー修正完了時点）
+最終更新日: 2026-01-11（注文履歴締日期間表示とロックファイル問題修正完了時点）
