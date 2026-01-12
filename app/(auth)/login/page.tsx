@@ -66,35 +66,60 @@ function LoginPageContent() {
   useEffect(() => {
     // URLハッシュからトークンを確認（Supabaseのパスワードリセットリンクはハッシュに含まれる）
     if (typeof window !== "undefined") {
-      const hash = window.location.hash;
+      const checkHash = async () => {
+        const hash = window.location.hash;
+        console.log("Checking hash:", hash);
 
-      if (hash) {
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const accessToken = hashParams.get("access_token");
-        const type = hashParams.get("type");
+        if (hash) {
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get("access_token");
+          const type = hashParams.get("type");
+          console.log("Hash params - type:", type, "accessToken:", accessToken ? "exists" : "missing");
 
-        // パスワードリセットタイプの場合
-        if (type === "recovery" && accessToken) {
-          setIsUpdatePassword(true);
-          setIsResetPassword(false);
-          setIsSignup(false);
-          // URLからハッシュを削除（見た目をクリーンにするため）
-          // ただし、Supabaseのセッションはハッシュから復元されるので、クライアント側で保持
-          const newUrl =
-            window.location.pathname + (window.location.search || "");
-          window.history.replaceState(null, "", newUrl);
-          return;
+          // パスワードリセットタイプの場合
+          if (type === "recovery" && accessToken) {
+            console.log("Password reset token detected, enabling password update mode...");
+            
+            // パスワード更新モードに切り替える（セッションの復元を待たない）
+            setIsUpdatePassword(true);
+            setIsResetPassword(false);
+            setIsSignup(false);
+            
+            // Supabaseのセッションが復元されるまで少し待つ（ただし、フォームは先に表示）
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            
+            // セッションを確認（デバッグ用）
+            const { data: { session }, error } = await supabase.auth.getSession();
+            console.log("Session check - session:", session ? "exists" : "missing", "error:", error);
+            
+            // URLからハッシュを削除（見た目をクリーンにするため）
+            // ただし、Supabaseのセッションはハッシュから復元されるので、クライアント側で保持
+            const newUrl =
+              window.location.pathname + (window.location.search || "");
+            window.history.replaceState(null, "", newUrl);
+            console.log("Password update mode enabled");
+            return;
+          }
         }
-      }
 
-      // クエリパラメータも確認（従来の方式との互換性）
-      const resetParam = searchParams?.get("reset");
-      if (resetParam === "true") {
-        // クエリパラメータのみでreset=trueの場合は、ハッシュを待つ
-        // 実際のトークンはハッシュから来るため、ここでは何もしない
-      }
+        // クエリパラメータも確認（従来の方式との互換性）
+        const resetParam = searchParams?.get("reset");
+        if (resetParam === "true") {
+          console.log("Reset parameter found, checking for hash...");
+          // クエリパラメータのみでreset=trueの場合は、ハッシュを待つ
+          // 実際のトークンはハッシュから来るため、ここでは何もしない
+        }
+      };
+
+      // 少し遅延させてから実行（Supabaseクライアントの初期化を待つ）
+      const timer = setTimeout(() => {
+        checkHash();
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,26 +269,37 @@ function LoginPageContent() {
         ? `${siteUrl}/login?reset=true`
         : `${window.location.origin}/login?reset=true`;
 
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      console.log("Sending password reset email to:", email);
+      console.log("Redirect URL:", redirectUrl);
+      
+      const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         {
           redirectTo: redirectUrl,
         }
       );
 
+      console.log("Reset password response - data:", data, "error:", resetError);
+
       if (resetError) {
+        console.error("Reset password error:", resetError);
         setError(translateAuthError(resetError.message));
         setLoading(false);
         return;
       }
 
+      console.log("Password reset email sent successfully");
       setSuccess(
         "パスワードリセットメールを送信しました。メールのリンクをクリックしてパスワードをリセットしてください。"
       );
       setEmail("");
     } catch (err) {
       console.error("Reset password error:", err);
-      setError("パスワードリセット処理中にエラーが発生しました");
+      setError(
+        `パスワードリセット処理中にエラーが発生しました: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
     } finally {
       setLoading(false);
     }
