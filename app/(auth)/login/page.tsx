@@ -64,9 +64,60 @@ function LoginPageContent() {
 
   // URLパラメータからパスワードリセットトークンを検出
   useEffect(() => {
-    // URLハッシュからトークンを確認（Supabaseのパスワードリセットリンクはハッシュに含まれる）
     if (typeof window !== "undefined") {
-      const checkHash = async () => {
+      const checkAuthState = async () => {
+        // PKCEフロー: クエリパラメータからupdate_passwordを確認
+        const updatePasswordParam = searchParams?.get("update_password");
+        const verifiedParam = searchParams?.get("verified");
+        const errorParam = searchParams?.get("error");
+
+        console.log("Auth state check - update_password:", updatePasswordParam, "verified:", verifiedParam, "error:", errorParam);
+
+        // エラーパラメータがある場合
+        if (errorParam) {
+          setError(translateAuthError(decodeURIComponent(errorParam)));
+          // URLからエラーパラメータを削除
+          const newUrl = window.location.pathname;
+          window.history.replaceState(null, "", newUrl);
+          return;
+        }
+
+        // メール確認完了の場合
+        if (verifiedParam === "true") {
+          setSuccess("メールアドレスが確認されました。ログインしてください。");
+          // URLからパラメータを削除
+          const newUrl = window.location.pathname;
+          window.history.replaceState(null, "", newUrl);
+          return;
+        }
+
+        // PKCEフロー: パスワード更新モード
+        if (updatePasswordParam === "true") {
+          console.log("PKCE flow: Password update mode detected");
+          
+          // セッションを確認
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          console.log("Session check - session:", session ? "exists" : "missing", "error:", sessionError);
+
+          if (session) {
+            setIsUpdatePassword(true);
+            setIsResetPassword(false);
+            setIsSignup(false);
+            // URLからパラメータを削除
+            const newUrl = window.location.pathname;
+            window.history.replaceState(null, "", newUrl);
+            console.log("Password update mode enabled (PKCE flow)");
+            return;
+          } else {
+            setError("セッションが無効です。もう一度パスワードリセットをお試しください。");
+            // URLからパラメータを削除
+            const newUrl = window.location.pathname;
+            window.history.replaceState(null, "", newUrl);
+            return;
+          }
+        }
+
+        // 従来のフロー（ハッシュベース）との互換性
         const hash = window.location.hash;
         console.log("Checking hash:", hash);
 
@@ -78,48 +129,38 @@ function LoginPageContent() {
 
           // パスワードリセットタイプの場合
           if (type === "recovery" && accessToken) {
-            console.log("Password reset token detected, enabling password update mode...");
+            console.log("Password reset token detected (legacy flow)");
             
-            // パスワード更新モードに切り替える（セッションの復元を待たない）
+            // パスワード更新モードに切り替える
             setIsUpdatePassword(true);
             setIsResetPassword(false);
             setIsSignup(false);
             
-            // Supabaseのセッションが復元されるまで少し待つ（ただし、フォームは先に表示）
+            // Supabaseのセッションが復元されるまで待つ
             await new Promise((resolve) => setTimeout(resolve, 300));
             
-            // セッションを確認（デバッグ用）
-            const { data: { session }, error } = await supabase.auth.getSession();
-            console.log("Session check - session:", session ? "exists" : "missing", "error:", error);
+            // セッションを確認
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            console.log("Session check - session:", session ? "exists" : "missing", "error:", sessionError);
             
-            // URLからハッシュを削除（見た目をクリーンにするため）
-            // ただし、Supabaseのセッションはハッシュから復元されるので、クライアント側で保持
-            const newUrl =
-              window.location.pathname + (window.location.search || "");
+            // URLからハッシュを削除
+            const newUrl = window.location.pathname + (window.location.search || "");
             window.history.replaceState(null, "", newUrl);
-            console.log("Password update mode enabled");
+            console.log("Password update mode enabled (legacy flow)");
             return;
           }
-        }
-
-        // クエリパラメータも確認（従来の方式との互換性）
-        const resetParam = searchParams?.get("reset");
-        if (resetParam === "true") {
-          console.log("Reset parameter found, checking for hash...");
-          // クエリパラメータのみでreset=trueの場合は、ハッシュを待つ
-          // 実際のトークンはハッシュから来るため、ここでは何もしない
         }
       };
 
       // 少し遅延させてから実行（Supabaseクライアントの初期化を待つ）
       const timer = setTimeout(() => {
-        checkHash();
+        checkAuthState();
       }, 100);
 
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,9 +306,11 @@ function LoginPageContent() {
         }
       }
 
+      // PKCEフロー: コールバックURLを使用
+      // SupabaseはこのURLにcodeパラメータを付けてリダイレクトする
       const redirectUrl = siteUrl
-        ? `${siteUrl}/login?reset=true`
-        : `${window.location.origin}/login?reset=true`;
+        ? `${siteUrl}/auth/callback?type=recovery`
+        : `${window.location.origin}/auth/callback?type=recovery`;
 
       console.log("Sending password reset email to:", email);
       console.log("Redirect URL:", redirectUrl);

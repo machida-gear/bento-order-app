@@ -30,8 +30,18 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
+      auth: {
+        // PKCEフローを使用
+        flowType: 'pkce',
+      },
     }
   )
+
+  // 認証コールバックルートはそのまま通す（PKCEコード交換用）
+  const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback')
+  if (isAuthCallback) {
+    return supabaseResponse
+  }
 
   // セッションをリフレッシュ（重要: 認証状態を最新に保つ）
   const {
@@ -52,8 +62,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // 認証済みユーザーがログインページにアクセスした場合はカレンダーへリダイレクト
-  if (user && isAuthRoute) {
+  // 認証済みユーザーがログインページにアクセスした場合
+  // ただし、パスワード更新モードの場合はリダイレクトしない
+  const isPasswordUpdate = request.nextUrl.searchParams.get('update_password') === 'true'
+  if (user && isAuthRoute && !isPasswordUpdate) {
     const url = request.nextUrl.clone()
     url.pathname = '/calendar'
     return NextResponse.redirect(url)
