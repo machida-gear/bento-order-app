@@ -52,11 +52,14 @@ function LoginPageContent() {
   const [name, setName] = useState(""); // 新規登録用：氏名
   const [employeeCode, setEmployeeCode] = useState(""); // 新規登録用：社員コード
   const [invitationCode, setInvitationCode] = useState(""); // 新規登録用：招待コード
+  const [otpCode, setOtpCode] = useState(""); // OTPコード入力用
+  const [resetEmail, setResetEmail] = useState(""); // パスワードリセット用メールアドレス保持
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(false);
+  const [isOtpInput, setIsOtpInput] = useState(false); // OTPコード入力モード
   const [isUpdatePassword, setIsUpdatePassword] = useState(false); // パスワード更新モード
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -293,33 +296,12 @@ function LoginPageContent() {
         return;
       }
 
-      // 本番環境のURLを環境変数から取得
-      // 本番環境では必ずNEXT_PUBLIC_SITE_URLを設定すること
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-      if (!siteUrl) {
-        // 開発環境の場合のみ警告を表示
-        if (window.location.origin.includes("localhost")) {
-          console.warn(
-            "NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。"
-          );
-        }
-      }
-
-      // PKCEフロー: コールバックURLを使用
-      // SupabaseはこのURLにcodeパラメータを付けてリダイレクトする
-      const redirectUrl = siteUrl
-        ? `${siteUrl}/auth/callback?type=recovery`
-        : `${window.location.origin}/auth/callback?type=recovery`;
-
       console.log("Sending password reset email to:", email);
-      console.log("Redirect URL:", redirectUrl);
       
+      // OTPコード方式: リダイレクトURLなしでメールを送信
+      // これにより、メールにはリンクとOTPコードの両方が含まれる
       const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
-        {
-          redirectTo: redirectUrl,
-        }
+        email
       );
 
       console.log("Reset password response - data:", data, "error:", resetError);
@@ -332,8 +314,13 @@ function LoginPageContent() {
       }
 
       console.log("Password reset email sent successfully");
+      
+      // メールアドレスを保持してOTP入力モードに切り替え
+      setResetEmail(email);
+      setIsOtpInput(true);
+      setIsResetPassword(false);
       setSuccess(
-        "パスワードリセットメールを送信しました。メールのリンクをクリックしてパスワードをリセットしてください。"
+        "パスワードリセットメールを送信しました。メールに記載された6桁のコードを入力してください。"
       );
       setEmail("");
     } catch (err) {
@@ -343,6 +330,59 @@ function LoginPageContent() {
           err instanceof Error ? err.message : String(err)
         }`
       );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // OTPコード検証
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      if (!otpCode || otpCode.length < 6) {
+        setError("6桁のコードを入力してください");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Verifying OTP for email:", resetEmail);
+
+      // OTPコードを検証
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email: resetEmail,
+        token: otpCode,
+        type: 'recovery',
+      });
+
+      console.log("Verify OTP response - data:", data, "error:", verifyError);
+
+      if (verifyError) {
+        console.error("Verify OTP error:", verifyError);
+        if (verifyError.message.includes("expired")) {
+          setError("コードの有効期限が切れました。もう一度パスワードリセットをお試しください。");
+        } else if (verifyError.message.includes("invalid")) {
+          setError("コードが正しくありません。もう一度確認してください。");
+        } else {
+          setError(translateAuthError(verifyError.message));
+        }
+        setLoading(false);
+        return;
+      }
+
+      console.log("OTP verified successfully, switching to password update mode");
+
+      // OTP検証成功 → パスワード更新モードに切り替え
+      setIsOtpInput(false);
+      setIsUpdatePassword(true);
+      setSuccess("コードが確認されました。新しいパスワードを設定してください。");
+      setOtpCode("");
+    } catch (err) {
+      console.error("Verify OTP error:", err);
+      setError("コード検証中にエラーが発生しました");
     } finally {
       setLoading(false);
     }
@@ -421,6 +461,8 @@ function LoginPageContent() {
             <p className="text-gray-500 mt-2">
               {isUpdatePassword
                 ? "新しいパスワードを設定"
+                : isOtpInput
+                ? "確認コードを入力"
                 : isResetPassword
                 ? "パスワードリセット"
                 : isSignup
@@ -443,11 +485,13 @@ function LoginPageContent() {
             </div>
           )}
 
-          {/* ログインフォーム / 新規登録フォーム / パスワードリセットフォーム */}
+          {/* ログインフォーム / 新規登録フォーム / パスワードリセットフォーム / OTP入力フォーム */}
           <form
             onSubmit={
               isUpdatePassword
                 ? handleUpdatePassword
+                : isOtpInput
+                ? handleVerifyOtp
                 : isResetPassword
                 ? handleResetPassword
                 : isSignup
@@ -528,25 +572,62 @@ function LoginPageContent() {
                 </div>
               </>
             )}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                メールアドレス
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
-                placeholder="example@company.com"
-              />
-            </div>
+            {/* OTP入力モードとパスワード更新モードではメールアドレス入力を非表示 */}
+            {!isOtpInput && !isUpdatePassword && (
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  メールアドレス
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none"
+                  placeholder="example@company.com"
+                />
+              </div>
+            )}
 
-            {isUpdatePassword ? (
+            {isOtpInput ? (
+              /* OTPコード入力フォーム */
+              <div>
+                <label
+                  htmlFor="otpCode"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  確認コード（6桁） <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="otpCode"
+                  type="text"
+                  inputMode="numeric"
+                  value={otpCode}
+                  onChange={(e) => {
+                    // 数字のみ入力可能、最大6文字
+                    const value = e.target.value
+                      .replace(/[^0-9]/g, "")
+                      .slice(0, 6);
+                    setOtpCode(value);
+                  }}
+                  required
+                  maxLength={6}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none text-center text-2xl tracking-[0.5em] font-mono"
+                  placeholder="000000"
+                  autoComplete="one-time-code"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  メールに記載された6桁の数字を入力してください
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  送信先: {resetEmail}
+                </p>
+              </div>
+            ) : isUpdatePassword ? (
               <>
                 <div>
                   <label
@@ -641,6 +722,8 @@ function LoginPageContent() {
               {loading
                 ? isUpdatePassword
                   ? "更新中..."
+                  : isOtpInput
+                  ? "確認中..."
                   : isResetPassword
                   ? "送信中..."
                   : isSignup
@@ -648,6 +731,8 @@ function LoginPageContent() {
                   : "ログイン中..."
                 : isUpdatePassword
                 ? "パスワードを更新"
+                : isOtpInput
+                ? "コードを確認"
                 : isResetPassword
                 ? "リセットメールを送信"
                 : isSignup
@@ -673,7 +758,40 @@ function LoginPageContent() {
                 ログインに戻る
               </button>
             )}
-            {!isResetPassword && !isUpdatePassword && (
+            {isOtpInput && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // コードを再送信
+                    setIsOtpInput(false);
+                    setIsResetPassword(true);
+                    setEmail(resetEmail);
+                    setOtpCode("");
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-sm text-amber-600 hover:text-amber-700 font-medium block"
+                >
+                  コードを再送信する
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOtpInput(false);
+                    setIsResetPassword(false);
+                    setError(null);
+                    setSuccess(null);
+                    setOtpCode("");
+                    setResetEmail("");
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-600 font-medium block"
+                >
+                  ログインに戻る
+                </button>
+              </>
+            )}
+            {!isResetPassword && !isUpdatePassword && !isOtpInput && (
               <button
                 type="button"
                 onClick={() => {
@@ -692,7 +810,7 @@ function LoginPageContent() {
                   : "アカウントをお持ちでない方はこちら"}
               </button>
             )}
-            {!isSignup && (
+            {!isSignup && !isOtpInput && !isUpdatePassword && (
               <button
                 type="button"
                 onClick={() => {
