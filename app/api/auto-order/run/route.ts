@@ -172,8 +172,8 @@ async function runAutoOrder(request: NextRequest) {
       throw runError
     }
 
-    const runId = runRecord.id
-    runId = runRecord.id
+    const createdRunId = runRecord.id
+    runId = createdRunId
     runRecordLogDetails = runRecord.log_details
 
     // 有効なユーザーとテンプレートを取得
@@ -202,12 +202,12 @@ async function runAutoOrder(request: NextRequest) {
             message: '有効なユーザーが存在しません',
           },
         })
-        .eq('id', runId)
+        .eq('id', createdRunId)
 
       return NextResponse.json({
         success: true,
         message: '有効なユーザーが存在しません',
-        run_id: runId,
+        run_id: createdRunId,
       })
     }
 
