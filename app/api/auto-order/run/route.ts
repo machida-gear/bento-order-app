@@ -3,18 +3,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * 自動注文実行API
- * POST /api/auto-order/run
+ * GET/POST /api/auto-order/run
  * 
  * 締切時刻を過ぎた後、自動的に翌営業日の注文を作成
  * スケジューラー（Cron Job）から呼び出される
  */
-export async function POST(request: NextRequest) {
+async function runAutoOrder(request: NextRequest) {
   try {
     // Vercel Cron Jobsからの呼び出しを確認
     // Vercel Cron Jobsは自動的に `x-vercel-cron` ヘッダーを付与します
     const isVercelCron = request.headers.get('x-vercel-cron') === '1'
     
     console.log('=== Auto Order Run API Called ===')
+    console.log('method:', request.method)
     console.log('isVercelCron:', isVercelCron)
     
     // 開発環境や手動実行の場合は、Authorizationヘッダーで認証
@@ -434,4 +435,14 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Vercel Cron は GET で呼ばれるため、GET でも実行できるようにする
+export async function GET(request: NextRequest) {
+  return runAutoOrder(request)
+}
+
+// 手動実行（curl等）は POST を想定（Authorizationヘッダーで保護）
+export async function POST(request: NextRequest) {
+  return runAutoOrder(request)
 }
