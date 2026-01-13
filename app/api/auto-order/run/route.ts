@@ -148,9 +148,9 @@ async function runAutoOrder(request: NextRequest) {
         run_date: todayStr,
         executed_at: now.toISOString(),
         // NOTE:
-        // 本番DBのCHECK制約で 'running' が許可されていない環境があるため、
-        // status は 'completed' に統一し、進行状況は log_details に記録する。
-        status: 'completed',
+        // 本番DBのCHECK制約: status は 'success' | 'failed' | 'partial' のみ許可
+        // 開始時点では暫定で success とし、最後に集計して success/partial/failed を確定する
+        status: 'success',
         log_details: {
           target_date: targetDate,
           executed_at: now.toISOString(),
@@ -196,10 +196,11 @@ async function runAutoOrder(request: NextRequest) {
       await (supabaseAdmin
         .from('auto_order_runs') as any)
         .update({
-          status: 'completed',
+          status: 'success',
           log_details: {
             ...runRecord.log_details,
             message: '有効なユーザーが存在しません',
+            stage: 'completed',
           },
         })
         .eq('id', createdRunId)
@@ -429,6 +430,11 @@ async function runAutoOrder(request: NextRequest) {
     const createdCount = results.filter(r => r.result === 'created').length
     const skippedCount = results.filter(r => r.result === 'skipped').length
     const errorCount = results.filter(r => r.result === 'error').length
+    const totalCount = results.length
+
+    // 本番DBのstatus制約に合わせて最終ステータスを決定
+    const finalStatus =
+      errorCount === 0 ? 'success' : createdCount + skippedCount === 0 ? 'failed' : 'partial'
 
     console.log('Auto order results:', {
       created: createdCount,
@@ -440,14 +446,14 @@ async function runAutoOrder(request: NextRequest) {
     await (supabaseAdmin
       .from('auto_order_runs') as any)
       .update({
-        status: 'completed',
+        status: finalStatus,
         log_details: {
           ...runRecord.log_details,
           target_date: targetDate,
           created: createdCount,
           skipped: skippedCount,
           errors: errorCount,
-          total: results.length,
+          total: totalCount,
           stage: 'completed',
         },
       })
@@ -477,7 +483,7 @@ async function runAutoOrder(request: NextRequest) {
       try {
         await (supabaseAdmin.from('auto_order_runs') as any)
           .update({
-            status: 'completed',
+            status: 'failed',
             log_details: {
               ...(runRecordLogDetails || {}),
               stage: 'error',
