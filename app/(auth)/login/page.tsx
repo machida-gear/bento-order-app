@@ -45,6 +45,7 @@ function translateAuthError(message: string): string {
  * ログインページ（useSearchParamsを使用する内部コンポーネント）
  */
 function LoginPageContent() {
+  const OTP_LENGTH = 8;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState(""); // パスワードリセット用：新しいパスワード
@@ -320,7 +321,7 @@ function LoginPageContent() {
       setIsOtpInput(true);
       setIsResetPassword(false);
       setSuccess(
-        "パスワードリセットメールを送信しました。メールに記載された6桁のコードを入力してください。"
+        `パスワードリセットメールを送信しました。メールに記載された${OTP_LENGTH}桁のコードを入力してください。`
       );
       setEmail("");
     } catch (err) {
@@ -343,8 +344,8 @@ function LoginPageContent() {
     setLoading(true);
 
     try {
-      if (!otpCode || otpCode.length < 6) {
-        setError("6桁のコードを入力してください");
+      if (!otpCode || otpCode.length !== OTP_LENGTH) {
+        setError(`${OTP_LENGTH}桁のコードを入力してください`);
         setLoading(false);
         return;
       }
@@ -600,7 +601,7 @@ function LoginPageContent() {
                   htmlFor="otpCode"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  確認コード（6桁） <span className="text-red-500">*</span>
+                  確認コード（{OTP_LENGTH}桁） <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="otpCode"
@@ -608,20 +609,20 @@ function LoginPageContent() {
                   inputMode="numeric"
                   value={otpCode}
                   onChange={(e) => {
-                    // 数字のみ入力可能、最大6文字
+                    // 数字のみ入力可能、最大OTP_LENGTH文字
                     const value = e.target.value
                       .replace(/[^0-9]/g, "")
-                      .slice(0, 6);
+                      .slice(0, OTP_LENGTH);
                     setOtpCode(value);
                   }}
                   required
-                  maxLength={6}
+                  maxLength={OTP_LENGTH}
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-colors outline-none text-center text-2xl tracking-[0.5em] font-mono"
-                  placeholder="000000"
+                  placeholder={"0".repeat(OTP_LENGTH)}
                   autoComplete="one-time-code"
                 />
                 <p className="mt-2 text-xs text-gray-500">
-                  メールに記載された6桁の数字を入力してください
+                  メールに記載された{OTP_LENGTH}桁の数字を入力してください
                 </p>
                 <p className="mt-1 text-xs text-gray-400">
                   送信先: {resetEmail}
