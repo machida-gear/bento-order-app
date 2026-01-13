@@ -411,6 +411,29 @@ export async function PATCH(
           throw error;
         }
 
+        // JST基準で「今日」を取得（YYYY-MM-DD）
+        const getTodayJstStr = () => {
+          const now = new Date();
+          const jstOffset = 9 * 60 * 60 * 1000;
+          const jstNow = new Date(now.getTime() + jstOffset);
+          const y = jstNow.getUTCFullYear();
+          const m = String(jstNow.getUTCMonth() + 1).padStart(2, "0");
+          const d = String(jstNow.getUTCDate()).padStart(2, "0");
+          return `${y}-${m}-${d}`;
+        };
+
+        const todayJstStr = getTodayJstStr();
+
+        // 一般ユーザーは「過去日」の注文をキャンセル不可（JST基準）
+        // ※Vercel(UTC)とJSTのズレで過去注文がキャンセルできてしまうのを防ぐ
+        if (!isAdmin && typeof order.order_date === "string") {
+          if (order.order_date < todayJstStr) {
+            const error: any = new Error("過去の日付の注文はキャンセルできません");
+            error.statusCode = 400;
+            throw error;
+          }
+        }
+
         const orderDayResult = await client.query(
           "SELECT * FROM order_calendar WHERE target_date = $1",
           [order.order_date]
@@ -421,20 +444,19 @@ export async function PATCH(
         // 一般ユーザーの場合、締切時刻を過ぎた注文はキャンセル不可（管理者は可能）
         if (!isAdmin) {
           if (orderDay?.deadline_time) {
-            const orderDateObj = new Date(order.order_date + "T00:00:00");
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const isToday = orderDateObj.getTime() === today.getTime();
-
-            if (isToday || orderDateObj < today) {
+            // 当日（JST）のみ、締切時刻をチェック
+            if (order.order_date === todayJstStr) {
               const now = new Date();
+              const jstOffset = 9 * 60 * 60 * 1000;
+              const jstNow = new Date(now.getTime() + jstOffset);
               const [hours, minutes] = orderDay.deadline_time
                 .split(":")
                 .map(Number);
-              const deadline = new Date(orderDateObj);
-              deadline.setHours(hours, minutes, 0, 0);
+              const deadlineJst = new Date(jstNow);
+              deadlineJst.setUTCHours(hours, minutes, 0, 0);
 
-              if (now >= deadline) {
+              // deadlineJst は「jstNowをUTCとして扱う」ため、比較も同じくjstNowベースにする
+              if (jstNow >= deadlineJst) {
                 const error: any = new Error(
                   "締切時刻を過ぎているため、キャンセルできません"
                 );
@@ -443,18 +465,7 @@ export async function PATCH(
               }
             }
           } else {
-            // deadline_timeが設定されていない場合、過去の日付はキャンセル不可
-            const orderDateObj = new Date(order.order_date + "T00:00:00");
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            if (orderDateObj < today) {
-              const error: any = new Error(
-                "過去の日付の注文はキャンセルできません"
-              );
-              error.statusCode = 400;
-              throw error;
-            }
+            // deadline_timeが設定されていない場合は、当日以外は（上で過去はブロック済みのため）許可
           }
         }
 

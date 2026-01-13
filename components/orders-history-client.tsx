@@ -91,6 +91,17 @@ export default function OrdersHistoryClient({
     return '';
   };
 
+  // JST（YYYY-MM-DD）で今日の日付文字列を取得
+  const getTodayJstStr = (): string => {
+    const now = new Date()
+    const jstOffset = 9 * 60 * 60 * 1000 // JSTはUTC+9
+    const jstNow = new Date(now.getTime() + jstOffset)
+    const year = jstNow.getUTCFullYear()
+    const month = String(jstNow.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(jstNow.getUTCDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // 選択された期間に基づいて注文をフィルタリング
   const filteredOrders = orders.filter((order) => {
     const orderDate = formatOrderDate(order.order_date);
@@ -114,10 +125,7 @@ export default function OrdersHistoryClient({
     const jstNow = new Date(now.getTime() + jstOffset)
 
     // 今日の日付をJSTで取得（YYYY-MM-DD形式）
-    const year = jstNow.getUTCFullYear()
-    const month = String(jstNow.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(jstNow.getUTCDate()).padStart(2, '0')
-    const todayJSTStr = `${year}-${month}-${day}`
+    const todayJSTStr = getTodayJstStr()
 
     // 過去の日付は締切時間を過ぎている
     if (orderDate < todayJSTStr) {
@@ -134,7 +142,7 @@ export default function OrdersHistoryClient({
       let utcHours = hours - 9
       let utcDate = jstNow.getUTCDate()
       let utcMonth = jstNow.getUTCMonth()
-      let utcYear = year
+      let utcYear = jstNow.getUTCFullYear()
 
       // 時刻が負の場合は前日に繰り下げ
       if (utcHours < 0) {
@@ -252,7 +260,9 @@ export default function OrdersHistoryClient({
       <div className="space-y-3">
         {filteredOrders && filteredOrders.length > 0 ? (
           filteredOrders.map((order) => {
-            const date = new Date(order.order_date)
+            // order_dateがISO文字列の場合もあるため、必ずYYYY-MM-DDに正規化する
+            const normalizedOrderDate = formatOrderDate(order.order_date)
+            const date = new Date(normalizedOrderDate)
             const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][
               date.getDay()
             ]
@@ -301,9 +311,9 @@ export default function OrdersHistoryClient({
                             注文済み
                           </span>
                           {(() => {
-                            const orderDay = orderDaysMap.get(order.order_date)
+                            const orderDay = orderDaysMap.get(normalizedOrderDate)
                             const canCancel = !isAfterDeadline(
-                              order.order_date,
+                              normalizedOrderDate,
                               orderDay?.deadline_time || null
                             )
 
@@ -311,7 +321,7 @@ export default function OrdersHistoryClient({
                               return (
                                 <CancelOrderButton
                                   orderId={order.id}
-                                  orderDate={order.order_date}
+                                  orderDate={normalizedOrderDate}
                                 />
                               )
                             }
