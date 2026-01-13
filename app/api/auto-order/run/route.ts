@@ -9,6 +9,31 @@ import { NextRequest, NextResponse } from 'next/server'
  * スケジューラー（Cron Job）から呼び出される
  */
 async function runAutoOrder(request: NextRequest) {
+  const formatErrorForResponse = (err: unknown): string => {
+    if (err instanceof Error) return err.message
+    if (typeof err === 'string') return err
+    if (err && typeof err === 'object') {
+      const anyErr = err as any
+      const parts: string[] = []
+      if (typeof anyErr.message === 'string' && anyErr.message) {
+        parts.push(anyErr.message)
+      }
+      if (typeof anyErr.code === 'string' && anyErr.code) {
+        parts.push(`code=${anyErr.code}`)
+      }
+      if (typeof anyErr.details === 'string' && anyErr.details) {
+        parts.push(`details=${anyErr.details}`)
+      }
+      if (parts.length > 0) return parts.join(' | ')
+      try {
+        return JSON.stringify(anyErr)
+      } catch {
+        return 'Unknown error (non-serializable)'
+      }
+    }
+    return 'Unknown error'
+  }
+
   try {
     // Vercel Cron Jobsからの呼び出しを確認
     // Vercel Cron Jobsは自動的に `x-vercel-cron` ヘッダーを付与します
@@ -136,6 +161,7 @@ async function runAutoOrder(request: NextRequest) {
           { status: 409 }
         )
       }
+      console.error('auto_order_runs insert error:', runError)
       throw runError
     }
 
@@ -148,6 +174,7 @@ async function runAutoOrder(request: NextRequest) {
       .eq('is_active', true)
 
     if (usersError) {
+      console.error('profiles fetch error:', usersError)
       throw usersError
     }
 
@@ -216,6 +243,7 @@ async function runAutoOrder(request: NextRequest) {
           .order('day_of_week', { ascending: true })
 
         if (templatesError) {
+          console.error('templates fetch error:', templatesError)
           throw templatesError
         }
 
@@ -254,6 +282,7 @@ async function runAutoOrder(request: NextRequest) {
 
         const menuTyped = menu as { is_active?: boolean; [key: string]: any } | null
         if (menuError || !menuTyped || !menuTyped.is_active) {
+          if (menuError) console.error('menu fetch error:', menuError)
           results.push({
             user_id: user.id,
             result: 'error',
@@ -270,6 +299,7 @@ async function runAutoOrder(request: NextRequest) {
           })
 
         if (priceError || !priceId) {
+          if (priceError) console.error('get_menu_price_id error:', priceError)
           results.push({
             user_id: user.id,
             result: 'error',
@@ -287,6 +317,7 @@ async function runAutoOrder(request: NextRequest) {
 
         const priceInfoTyped = priceInfo as { price: number; [key: string]: any } | null
         if (priceInfoError || !priceInfoTyped) {
+          if (priceInfoError) console.error('price fetch error:', priceInfoError)
           results.push({
             user_id: user.id,
             result: 'error',
@@ -429,7 +460,7 @@ async function runAutoOrder(request: NextRequest) {
     console.error('=== Auto Order Run Error ===')
     console.error('Error:', error)
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorMessage = formatErrorForResponse(error)
     return NextResponse.json(
       { error: '自動注文の実行に失敗しました: ' + errorMessage },
       { status: 500 }
