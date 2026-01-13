@@ -34,6 +34,9 @@ async function runAutoOrder(request: NextRequest) {
     return 'Unknown error'
   }
 
+  let runId: number | null = null
+  let runRecordLogDetails: any = null
+
   try {
     // Vercel Cron Jobsからの呼び出しを確認
     // Vercel Cron Jobsは自動的に `x-vercel-cron` ヘッダーを付与します
@@ -144,10 +147,14 @@ async function runAutoOrder(request: NextRequest) {
       .insert({
         run_date: todayStr,
         executed_at: now.toISOString(),
-        status: 'running',
+        // NOTE:
+        // 本番DBのCHECK制約で 'running' が許可されていない環境があるため、
+        // status は 'completed' に統一し、進行状況は log_details に記録する。
+        status: 'completed',
         log_details: {
           target_date: targetDate,
           executed_at: now.toISOString(),
+          stage: 'started',
         },
       })
       .select()
@@ -166,6 +173,8 @@ async function runAutoOrder(request: NextRequest) {
     }
 
     const runId = runRecord.id
+    runId = runRecord.id
+    runRecordLogDetails = runRecord.log_details
 
     // 有効なユーザーとテンプレートを取得
     const { data: users, error: usersError } = await supabaseAdmin
@@ -439,6 +448,7 @@ async function runAutoOrder(request: NextRequest) {
           skipped: skippedCount,
           errors: errorCount,
           total: results.length,
+          stage: 'completed',
         },
       })
       .eq('id', runId)
@@ -461,6 +471,24 @@ async function runAutoOrder(request: NextRequest) {
     console.error('Error:', error)
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     const errorMessage = formatErrorForResponse(error)
+
+    // 実行履歴が作成済みなら、失敗内容を log_details に残す（statusは 'completed' に統一）
+    if (runId) {
+      try {
+        await (supabaseAdmin.from('auto_order_runs') as any)
+          .update({
+            status: 'completed',
+            log_details: {
+              ...(runRecordLogDetails || {}),
+              stage: 'error',
+              error: errorMessage,
+            },
+          })
+          .eq('id', runId)
+      } catch (updateErr) {
+        console.error('Failed to update auto_order_runs on error:', updateErr)
+      }
+    }
     return NextResponse.json(
       { error: '自動注文の実行に失敗しました: ' + errorMessage },
       { status: 500 }

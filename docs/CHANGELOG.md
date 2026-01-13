@@ -40,6 +40,11 @@
 - `components/orders-history-client.tsx`
 - `app/api/orders/[id]/route.ts`
 
+### 自動注文（手動実行で500になる問題の調査・修正）
+
+- **問題**: 手動実行時に `auto_order_runs.status` の制約違反（`running` が許可されず 23514）
+- **対応**: 実行履歴の `status` を環境差分に耐えるように見直し、進行状況/エラーは `log_details` に記録するように修正
+
 ---
 
 ## 2026-01-11（レポート画面改善・注文履歴ページの締日期間集計機能追加・開発環境改善）
