@@ -30,10 +30,6 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
-      auth: {
-        // PKCEフローを使用
-        flowType: 'pkce',
-      },
     }
   )
 

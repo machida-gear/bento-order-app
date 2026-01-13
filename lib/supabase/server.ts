@@ -31,10 +31,6 @@ export async function createClient() {
           }
         },
       },
-      auth: {
-        // PKCEフローを使用（URLスキャナによるトークン消費を防ぐ）
-        flowType: 'pkce',
-      },
     }
   )
 }
