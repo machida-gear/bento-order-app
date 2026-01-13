@@ -45,6 +45,14 @@ async function runAutoOrder(request: NextRequest) {
     console.log('=== Auto Order Run API Called ===')
     console.log('method:', request.method)
     console.log('isVercelCron:', isVercelCron)
+
+    // 実行元のメタ情報（DB側のlog_detailsにも保存して、Cron実行の有無を追跡できるようにする）
+    const invocation = {
+      invoked_by: isVercelCron ? 'vercel_cron' : 'manual',
+      method: request.method,
+      isVercelCron,
+      at: new Date().toISOString(),
+    }
     
     // 開発環境や手動実行の場合は、Authorizationヘッダーで認証
     if (!isVercelCron) {
@@ -155,6 +163,7 @@ async function runAutoOrder(request: NextRequest) {
           target_date: targetDate,
           executed_at: now.toISOString(),
           stage: 'started',
+          invocation,
         },
       })
       .select()
@@ -455,6 +464,7 @@ async function runAutoOrder(request: NextRequest) {
           errors: errorCount,
           total: totalCount,
           stage: 'completed',
+          final_status: finalStatus,
         },
       })
       .eq('id', runId)
@@ -471,6 +481,7 @@ async function runAutoOrder(request: NextRequest) {
         errors: errorCount,
         total: results.length,
       },
+      invocation,
     })
   } catch (error) {
     console.error('=== Auto Order Run Error ===')
