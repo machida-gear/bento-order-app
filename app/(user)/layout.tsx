@@ -48,9 +48,8 @@ export default async function UserLayout({
     leftDate.setHours(0, 0, 0, 0);
 
     if (leftDate < today) {
-      // 退職済みの場合はログアウト
-      await supabase.auth.signOut();
-      redirect("/login");
+      // 仕様: アクセス制御は is_active を正とし、left_date は情報扱い（過去でも即ログアウトしない）
+      // ※過去 left_date でも is_active=true のユーザーが存在するケース（データ移行・誤設定等）でログイン不能になるのを防ぐ
     }
   }
 

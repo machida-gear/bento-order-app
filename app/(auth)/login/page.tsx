@@ -186,7 +186,7 @@ function LoginPageContent() {
 
       // プロフィールを取得して承認状態をチェック
       if (data.user) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("is_active")
           .eq("id", data.user.id)

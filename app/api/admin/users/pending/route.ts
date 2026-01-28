@@ -53,19 +53,12 @@ export async function GET() {
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
     const tomorrowStr = tomorrow.toISOString().split('T')[0]
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/pending/route.ts:52',message:'GET pending: Query params',data:{todayStr,tomorrowStr,queryCondition:`is_active=false AND (left_date IS NULL OR left_date >= ${tomorrowStr})`},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('is_active', false)
       .or(`left_date.is.null,left_date.gte.${tomorrowStr}`)
       .order('created_at', { ascending: false })
-    // #region agent log
-    const dataTyped = data as Array<{ id: string; employee_code?: string; is_active?: boolean; left_date?: string | null; [key: string]: any }> | null
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/pending/route.ts:62',message:'GET pending: Results',data:{count:dataTyped?.length,users:dataTyped?.map(u=>({id:u.id,employee_code:u.employee_code,is_active:u.is_active,left_date:u.left_date}))},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
 
     if (error) {
       console.error('Pending users fetch error:', error)

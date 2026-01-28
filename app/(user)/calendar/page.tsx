@@ -154,12 +154,6 @@ export default async function CalendarPage({
   const startDateStr = formatDateLocal(firstDayOfMonth);
   const endDateStr = formatDateLocal(lastDayOfMonth);
 
-  // #region agent log
-  try {
-    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:156',message:'Date range for query',data:{currentYear,currentMonth,currentMonthDisplay,startDateStr,endDateStr,firstDayOfMonth:firstDayOfMonth.toISOString(),lastDayOfMonth:lastDayOfMonth.toISOString(),hasDatabaseUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-
   // Transaction connectionを使用してデータを取得（パフォーマンス向上）
   // DATABASE_URLが設定されていない場合はSupabaseクライアントを使用
   const { orderDays, orders, systemSettings, calendarError, ordersError } = hasDatabaseUrl ? await queryDatabase(async (client): Promise<{
@@ -177,12 +171,6 @@ export default async function CalendarPage({
       [startDateStr, endDateStr]
     );
     const orderDays = calendarResult.rows;
-
-    // #region agent log
-    try {
-      await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:173',message:'orderDays fetched (Transaction)',data:{orderDaysCount:orderDays.length,orderDaysSample:orderDays.slice(0,3).map((d:any)=>({target_date:d.target_date,is_available:d.is_available})),startDateStr,endDateStr},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    } catch (e) {}
-    // #endregion
 
     // 注文データを取得（RLSをバイパスするため、直接PostgreSQL接続を使用）
     const ordersResult = await client.query(
@@ -244,12 +232,6 @@ export default async function CalendarPage({
         .order("target_date", { ascending: true });
       
       const orderDays = calendarResult.data || [];
-
-      // #region agent log
-      try {
-        await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:234',message:'orderDays fetched (Supabase)',data:{orderDaysCount:orderDays.length,orderDaysSample:orderDays.slice(0,3).map((d:any)=>({target_date:d.target_date,is_available:d.is_available})),startDateStr,endDateStr,calendarError:calendarResult.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      } catch (e) {}
-      // #endregion
 
       // 注文データを取得（targetUserIdを使用）
       const ordersResult = await supabase
@@ -409,30 +391,8 @@ export default async function CalendarPage({
     orderDaysMapObj[dateKey] = day;
   });
 
-  // #region agent log
-  try {
-    const sampleDays = (orderDays || []).slice(0, 5).map((d: any) => ({
-      target_date: d.target_date,
-      target_date_type: typeof d.target_date,
-      is_available: d.is_available,
-      mapped_key: d.target_date instanceof Date 
-        ? formatDateLocal(d.target_date)
-        : typeof d.target_date === 'string'
-        ? d.target_date.split('T')[0]
-        : String(d.target_date).split('T')[0]
-    }));
-    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:390',message:'orderDaysMapObj created',data:{orderDaysCount:orderDays?.length||0,orderDaysMapObjKeysCount:Object.keys(orderDaysMapObj).length,orderDaysMapObjKeys:Object.keys(orderDaysMapObj).slice(0,10),sampleDays},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
-
   // 同じ日に複数の注文がある場合、最初の1つを使用（仕様上1日1注文のみ）
   const ordersMapObj: Record<string, (typeof ordersWithMenu)[0]> = {};
-
-  // #region agent log
-  try {
-    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:391',message:'Before creating ordersMapObj',data:{ordersWithMenuCount:ordersWithMenu.length,orderDaysCount:orderDays?.length||0,orderDaysMapObjKeys:Object.keys(orderDaysMapObj).length,systemSettingsMaxDays:systemSettings?.max_order_days_ahead},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
 
   for (const order of ordersWithMenu) {
     // order_dateはdate型なので、YYYY-MM-DD形式の文字列として取得される
@@ -457,13 +417,6 @@ export default async function CalendarPage({
       ordersMapObj[dateKey] = order;
     }
   }
-
-  // #region agent log
-  try {
-    const sampleDates = Object.keys(ordersMapObj).slice(0, 5);
-    await fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:413',message:'After creating ordersMapObj',data:{ordersMapObjKeysCount:Object.keys(ordersMapObj).length,orderDaysMapObjKeysCount:Object.keys(orderDaysMapObj).length,sampleOrderDates:sampleDates,sampleOrderDaysDates:Object.keys(orderDaysMapObj).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  } catch (e) {}
-  // #endregion
 
   // 前月・次月の計算（1-12で統一）
   const prevMonthDisplay =
@@ -556,14 +509,6 @@ export default async function CalendarPage({
       )}
 
       {/* カレンダーグリッド */}
-      {/* #region agent log */}
-      {(() => {
-        try {
-          fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'calendar/page.tsx:519',message:'Passing props to CalendarGrid',data:{year:currentYear,month:currentMonth,orderDaysMapKeysCount:Object.keys(orderDaysMapObj).length,ordersMapKeysCount:Object.keys(ordersMapObj).length,maxOrderDaysAhead:systemSettings?.max_order_days_ahead||30,isAdminMode,targetUserId:isAdminMode?targetUserId:undefined,orderDaysMapSample:Object.keys(orderDaysMapObj).slice(0,5),ordersMapSample:Object.keys(ordersMapObj).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        } catch (e) {}
-        return null;
-      })()}
-      {/* #endregion */}
       <CalendarGrid
         year={currentYear}
         month={currentMonth}

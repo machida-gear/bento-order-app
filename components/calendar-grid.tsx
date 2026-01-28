@@ -620,13 +620,6 @@ function CalendarCell({
                   e.stopPropagation();
                   // shouldBeGrayがtrueの場合、またはcanEditOrderValueがfalseの場合はクリックを防ぐ
                   if (shouldBeGray || !canEditOrderValue) {
-                    // #region agent log
-                    if (typeof window !== 'undefined') {
-                      const logData = {location:'calendar-grid.tsx:726',message:'Link click prevented',data:{orderId:order.id,canEdit,shouldBeGray,canEditOrderValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-                      console.log('[DEBUG]', logData);
-                      fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-                    }
-                    // #endregion
                     e.preventDefault();
                     alert('締切時刻を過ぎているため、注文を変更できません');
                   }

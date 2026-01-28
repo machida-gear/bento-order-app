@@ -204,9 +204,7 @@ Authユーザー削除時に監査ログを保持したまま削除可能にす�
 - `046_check_order_status_enum.sql` - order_status ENUM型の確認
 - `047_add_cancelled_to_order_status_enum.sql` - order_status ENUM型に値を追加（未使用）
 
-### システム設定・機能追加
-
-- `051_create_system_settings_table.sql` - システム設定テーブルの作成
+### システム設定・機能追加- `051_create_system_settings_table.sql` - システム設定テーブルの作成
 - `053_add_max_order_days_ahead.sql` - 最大注文可能日数設定の追加
 - `057_add_company_info_to_system_settings.sql` - 会社情報カラムの追加
 - `059_add_employee_codes_and_invitation_code.sql` - 社員コードマスターと招待コードの追加

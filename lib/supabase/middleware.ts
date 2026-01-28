@@ -6,6 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  const _mwStart = Date.now()
   let supabaseResponse = NextResponse.next({
     request,
   })

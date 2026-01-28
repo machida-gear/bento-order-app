@@ -362,9 +362,6 @@ export async function DELETE(
       console.warn('   会計・集計のため、注文データは削除されません。')
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/[id]/route.ts:360',message:'DELETE: Before update',data:{userId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     // 削除時にleft_dateを今日の日付に設定することで、
     // 承認待ちリストではなく無効なユーザーリストに表示されるようにする
     const today = new Date()
@@ -383,9 +380,6 @@ export async function DELETE(
       .eq('id', id)
       .select()
       .single()
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/31bb64a1-4cff-45b1-a971-f1576e521fb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/users/[id]/route.ts:372',message:'DELETE: After update',data:{userId:id,error:error?.message,updatedData:{is_active:data?.is_active,left_date:data?.left_date},todayStr},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
 
     if (error) {
       console.error('User delete error:', error)
