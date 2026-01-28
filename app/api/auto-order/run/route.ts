@@ -39,8 +39,10 @@ async function runAutoOrder(request: NextRequest) {
 
   try {
     // Vercel Cron Jobsからの呼び出しを確認
-    // Vercel Cron Jobsは自動的に `x-vercel-cron` ヘッダーを付与します
-    const isVercelCron = request.headers.get('x-vercel-cron') === '1'
+    // 環境によってヘッダー値が "1" 以外になる場合があるため、存在チェックとUAも併用する
+    const vercelCronHeader = request.headers.get('x-vercel-cron')
+    const userAgent = request.headers.get('user-agent') || ''
+    const isVercelCron = vercelCronHeader === '1' || vercelCronHeader === 'true' || userAgent.startsWith('vercel-cron/')
     
     console.log('=== Auto Order Run API Called ===')
     console.log('method:', request.method)
