@@ -243,6 +243,23 @@ export default async function TodayOrdersPage({
             </div>
           </div>
         </div>
+        
+        {/* 注文者一覧PDFボタン */}
+        {ordersWithDetails.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <a
+              href={`/api/admin/orders/today/order-list-pdf?date=${targetDate}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            >
+              📋 注文者一覧PDF（掲示用）
+            </a>
+            <p className="text-xs text-gray-500 mt-2">
+              ※ お弁当保管場所に掲示して、社員が自分の注文を確認できるようにします
+            </p>
+          </div>
+        )}
       </div>
 
       {/* エラーメッセージ */}

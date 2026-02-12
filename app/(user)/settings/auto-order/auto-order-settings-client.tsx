@@ -442,7 +442,7 @@ export default function AutoOrderSettingsClient({
           <span>注意事項</span>
         </h3>
         <ul className="mt-2 text-sm text-amber-700 space-y-1">
-          <li>• 自動注文は毎日の締切時刻に実行されます</li>
+          <li>• 自動注文は毎日10時に翌営業日の注文を実行します</li>
           <li>• 既に注文がある日はスキップされます</li>
           <li>• 自動注文後も締切前であれば変更・キャンセルできます</li>
           <li>• 同じ曜日（または毎日）に複数のテンプレートを設定することはできません</li>
