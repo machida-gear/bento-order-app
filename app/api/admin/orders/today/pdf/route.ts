@@ -207,88 +207,9 @@ export async function GET(request: NextRequest) {
       : process.env.PDF_SENDER_FAX || 'FAX: 00-0000-0000'
 
     // PDFを生成
-    // 日本語フォントを埋め込んで文字化けを防ぐ
+    // pdfkitはserverExternalPackages設定により、node_modulesからそのまま読み込まれる
+    // これにより.afmフォントファイルが正しく参照される
     const chunks: Buffer[] = []
-    
-    // pdfkitのデフォルトフォント（Helvetica）の問題を回避するため、
-    // フォントファイルをnode_modulesから直接読み込むように環境変数を設定
-    const fontDataDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
-    
-    // 実行時に確実にフォントファイルをコピーする
-    // Next.jsの開発環境では、.nextフォルダの構造が動的に変わる可能性があるため、
-    // 実行時にフォントファイルを確実に配置する
-    const possibleTargetDirs = [
-      path.join(process.cwd(), '.next', 'dev', 'server', 'vendor-chunks', 'data'),
-      path.join(process.cwd(), '.next', 'server', 'vendor-chunks', 'data'),
-      path.join(process.cwd(), '.next', 'static', 'chunks', 'data'),
-    ]
-    
-    // フォントファイルをコピー
-    if (fs.existsSync(fontDataDir)) {
-      const fontFiles = fs.readdirSync(fontDataDir).filter((file: string) => file.endsWith('.afm'))
-      
-      for (const targetDir of possibleTargetDirs) {
-        if (!fs.existsSync(targetDir)) {
-          try {
-            fs.mkdirSync(targetDir, { recursive: true })
-          } catch (error) {
-            console.warn(`Failed to create directory ${targetDir}:`, error)
-            continue
-          }
-        }
-        
-        // フォントファイルをコピー
-        for (const fontFile of fontFiles) {
-          const sourcePath = path.join(fontDataDir, fontFile)
-          const targetPath = path.join(targetDir, fontFile)
-          
-          try {
-            if (fs.existsSync(sourcePath) && !fs.existsSync(targetPath)) {
-              fs.copyFileSync(sourcePath, targetPath)
-              console.log(`Copied ${fontFile} to ${targetDir}`)
-            }
-          } catch (error) {
-            console.warn(`Failed to copy ${fontFile} to ${targetDir}:`, error)
-          }
-        }
-      }
-    }
-    
-    // pdfkitのフォントパスを環境変数で設定
-    // 最初に見つかったターゲットディレクトリを使用
-    let pdfkitFontPath: string | undefined
-    for (const targetDir of possibleTargetDirs) {
-      const helveticaPath = path.join(targetDir, 'Helvetica.afm')
-      if (fs.existsSync(helveticaPath)) {
-        pdfkitFontPath = targetDir
-        // 環境変数を設定（pdfkitが使用する）
-        // 注意: 環境変数はプロセス起動時に設定する必要があるため、
-        // 実行時に設定しても効果がない場合がある
-        process.env.PDFKIT_FONT_DATA_PATH = targetDir
-        console.log(`Using font path: ${targetDir}`)
-        break
-      }
-    }
-    
-    // フォントパスが見つからない場合は、node_modulesのパスを使用
-    if (!pdfkitFontPath && fs.existsSync(fontDataDir)) {
-      // フォントファイルが存在することを確認
-      const helveticaPath = path.join(fontDataDir, 'Helvetica.afm')
-      if (fs.existsSync(helveticaPath)) {
-        process.env.PDFKIT_FONT_DATA_PATH = fontDataDir
-        pdfkitFontPath = fontDataDir
-        console.log(`Using default font path: ${fontDataDir}`)
-      } else {
-        console.error(`Font file not found in ${fontDataDir}`)
-        throw new Error(`Font file not found. Please ensure pdfkit is installed correctly.`)
-      }
-    }
-    
-    // フォントパスが設定されていない場合はエラー
-    if (!pdfkitFontPath) {
-      console.error('Font path could not be determined')
-      throw new Error('Font path could not be determined. Please ensure pdfkit is installed correctly.')
-    }
     
     const doc = new PDFDocument({
       size: 'A4',
@@ -301,30 +222,25 @@ export async function GET(request: NextRequest) {
     })
     
     // 日本語フォントを登録（IPAフォントまたはNoto Sans JP）
-    // フォントファイルが存在する場合は使用、存在しない場合はデフォルトフォントを使用
+    // フォントファイルが存在する場合は使用、存在しない場合はデフォルトフォント（Helvetica）を使用
     let japaneseFontRegistered = false
     try {
-      // 複数のフォントパスを試す
       const possibleFontPaths = [
-        path.join(process.cwd(), 'public', 'fonts', 'ipaexg.ttf'), // IPAexゴシック（実際のファイル名）
-        path.join(process.cwd(), 'public', 'fonts', 'IPAexGothic.ttf'), // IPAexゴシック（標準名）
-        path.join(process.cwd(), 'public', 'fonts', 'ipag.ttf'), // IPAゴシック（旧版）
-        path.join(process.cwd(), 'public', 'fonts', 'ipagp.ttf'), // IPA Pゴシック
-        path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf'), // Noto Sans JP
-        path.join(process.cwd(), 'public', 'fonts', 'NotoSansCJK-Regular.ttf'), // Noto Sans CJK
+        path.join(process.cwd(), 'public', 'fonts', 'ipaexg.ttf'),
+        path.join(process.cwd(), 'public', 'fonts', 'IPAexGothic.ttf'),
+        path.join(process.cwd(), 'public', 'fonts', 'ipag.ttf'),
+        path.join(process.cwd(), 'public', 'fonts', 'ipagp.ttf'),
+        path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf'),
+        path.join(process.cwd(), 'public', 'fonts', 'NotoSansCJK-Regular.ttf'),
       ]
       
-      // デバッグ: フォントファイルの存在確認
-      console.log('Checking font files...')
       for (const fontPath of possibleFontPaths) {
-        const exists = fs.existsSync(fontPath)
-        console.log(`Font path: ${fontPath}, exists: ${exists}`)
-        if (exists) {
+        if (fs.existsSync(fontPath)) {
           try {
             doc.registerFont('Japanese', fontPath)
             doc.font('Japanese')
             japaneseFontRegistered = true
-            console.log(`✓ Japanese font registered successfully: ${fontPath}`)
+            console.log(`✓ Japanese font registered: ${fontPath}`)
             break
           } catch (fontError) {
             console.error(`Failed to register font ${fontPath}:`, fontError)
@@ -333,9 +249,7 @@ export async function GET(request: NextRequest) {
       }
       
       if (!japaneseFontRegistered) {
-        console.warn('⚠ Japanese font not found. PDF may display garbled text for Japanese characters.')
-        console.warn('Please download IPA font or Noto Sans JP and place it in public/fonts/')
-        console.warn('Checked paths:', possibleFontPaths)
+        console.warn('⚠ Japanese font not found. Using default font (Helvetica).')
       }
     } catch (error) {
       console.error('Failed to register Japanese font:', error)

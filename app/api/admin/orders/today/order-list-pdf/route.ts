@@ -150,61 +150,9 @@ export async function GET(request: NextRequest) {
     )
 
     // PDFを生成
+    // pdfkitはserverExternalPackages設定により、node_modulesからそのまま読み込まれる
+    // これにより.afmフォントファイルが正しく参照される
     const chunks: Buffer[] = []
-    
-    // pdfkitのフォント設定（既存のコードと同じロジック）
-    const fontDataDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
-    const possibleTargetDirs = [
-      path.join(process.cwd(), '.next', 'dev', 'server', 'vendor-chunks', 'data'),
-      path.join(process.cwd(), '.next', 'server', 'vendor-chunks', 'data'),
-      path.join(process.cwd(), '.next', 'static', 'chunks', 'data'),
-    ]
-    
-    if (fs.existsSync(fontDataDir)) {
-      const fontFiles = fs.readdirSync(fontDataDir).filter((file: string) => file.endsWith('.afm'))
-      
-      for (const targetDir of possibleTargetDirs) {
-        if (!fs.existsSync(targetDir)) {
-          try {
-            fs.mkdirSync(targetDir, { recursive: true })
-          } catch (error) {
-            console.warn(`Failed to create directory ${targetDir}:`, error)
-            continue
-          }
-        }
-        
-        for (const fontFile of fontFiles) {
-          const sourcePath = path.join(fontDataDir, fontFile)
-          const targetPath = path.join(targetDir, fontFile)
-          
-          try {
-            if (fs.existsSync(sourcePath) && !fs.existsSync(targetPath)) {
-              fs.copyFileSync(sourcePath, targetPath)
-            }
-          } catch (error) {
-            console.warn(`Failed to copy ${fontFile} to ${targetDir}:`, error)
-          }
-        }
-      }
-    }
-    
-    let pdfkitFontPath: string | undefined
-    for (const targetDir of possibleTargetDirs) {
-      const helveticaPath = path.join(targetDir, 'Helvetica.afm')
-      if (fs.existsSync(helveticaPath)) {
-        pdfkitFontPath = targetDir
-        process.env.PDFKIT_FONT_DATA_PATH = targetDir
-        break
-      }
-    }
-    
-    if (!pdfkitFontPath && fs.existsSync(fontDataDir)) {
-      const helveticaPath = path.join(fontDataDir, 'Helvetica.afm')
-      if (fs.existsSync(helveticaPath)) {
-        process.env.PDFKIT_FONT_DATA_PATH = fontDataDir
-        pdfkitFontPath = fontDataDir
-      }
-    }
     
     const doc = new PDFDocument({
       size: 'A4',
@@ -234,7 +182,7 @@ export async function GET(request: NextRequest) {
             doc.registerFont('Japanese', fontPath)
             doc.font('Japanese')
             japaneseFontRegistered = true
-            console.log(`✓ Japanese font registered successfully: ${fontPath}`)
+            console.log(`✓ Japanese font registered: ${fontPath}`)
             break
           } catch (fontError) {
             console.error(`Failed to register font ${fontPath}:`, fontError)
@@ -243,7 +191,7 @@ export async function GET(request: NextRequest) {
       }
       
       if (!japaneseFontRegistered) {
-        console.warn('⚠ Japanese font not found. PDF may display garbled text.')
+        console.warn('⚠ Japanese font not found. Using default font (Helvetica).')
       }
     } catch (error) {
       console.error('Failed to register Japanese font:', error)
